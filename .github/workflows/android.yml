@@ -14,7 +14,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '17' }
-      - uses: android-actions/setup-android@v3
+      # O runner ubuntu-latest já tem o SDK em $ANDROID_HOME; o AGP baixa platform e build-tools que faltarem.
+      - run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: '8.14.3' }
       # Assinatura estável (opcional): secrets ANDROID_KEYSTORE_B64, ANDROID_KEYSTORE_SENHA, ANDROID_CHAVE, ANDROID_CHAVE_SENHA.
