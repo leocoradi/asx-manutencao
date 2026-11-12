@@ -6,8 +6,18 @@ import { PLANO } from '../src/data.js';
 const oleo = PLANO.find((p) => p.id === 'oleo');
 const hoje = new Date('2026-11-12');
 
-test('sem registro', () => {
-  assert.equal(situacao(oleo, [], 100000, hoje).status, 'sem');
+test('sem registro e sem odômetro', () => {
+  assert.equal(situacao(oleo, [], 0, hoje).status, 'sem');
+});
+
+test('sem registro, estimado pelo odômetro', () => {
+  const s = situacao(oleo, [], 103250, hoje);
+  assert.equal(s.estimado, true);
+  assert.equal(s.proximo, 105000);
+  assert.equal(s.kmRestante, 1750);
+  assert.equal(s.status, 'ok');
+  assert.equal(situacao(oleo, [], 104100, hoje).status, 'breve');
+  assert.equal(situacao(oleo, [], 105000, hoje).proximo, 110000);
 });
 
 test('ok, breve e vencido por km', () => {

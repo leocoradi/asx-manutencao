@@ -1,7 +1,7 @@
 // Cache offline simples: app shell na instalação, rede com fallback ao cache depois.
-const CACHE = 'asx-v2';
+const CACHE = 'asx-v3';
 const SHELL = ['./', 'index.html', 'style.css', 'manifest.webmanifest', 'assets/icon.svg', 'assets/icon-512.png',
-  'src/app.js', 'src/data.js', 'src/plan.js', 'src/obd.js', 'src/signalset.js', 'src/car.js',
+  'src/app.js', 'src/data.js', 'src/plan.js', 'src/obd.js', 'src/signalset.js', 'src/car.js', 'src/hudiy.js',
   'vendor/model-viewer.min.js', 'vendor/meshopt_decoder.js', 'assets/asx.glb'];
 
 self.addEventListener('install', (e) => {

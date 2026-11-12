@@ -9,6 +9,7 @@ Web app (PWA) para acompanhar o Mitsubishi ASX 2017/2018 2.0 16V MIVEC 4x2, câm
 - **Combustível**: registro de abastecimentos, km/L por tanque cheio, média e custo por km.
 - **Ficha**: motor, fluidos e capacidades, pneus, lâmpadas, velas, fusíveis.
 - **OBD**: leitura ao vivo via ELM327 Bluetooth LE (Web Bluetooth), códigos de falha (serviço 03), odômetro e contador de revisão do painel. Há um simulador para ver a tela sem adaptador.
+- **Player e navegação**: na central Hudiy, o rodapé mostra o que está tocando (capa, faixa, artista, posição) com anterior / play-pause / próxima, e o Início mostra a manobra atual do Android Auto (ícone, distância, instrução). No celular, o rodapé tem atalhos para abrir YouTube Music e Waze.
 - **Backup**: ícone de engrenagem exporta e importa JSON. Os dados ficam no `localStorage` do aparelho.
 
 Base técnica em `src/data.js`, extraída do manual do proprietário e do manual do Copilito da ASX (intervalos de uso severo no Brasil).
@@ -52,6 +53,9 @@ Android Auto só executa apps nativos de categorias aprovadas pelo Google; um we
 2. Copie `hudiy/applications.json` e `hudiy/applications_menu.json` para `~/.hudiy/share/config/`, ajustando a URL. Isso cria o item "ASX" no menu de aplicativos.
 3. Na tela OBD, toque em **Central Hudiy**. O app fala com `ws://localhost:44406` (porta `webSocketEndpointPort` da configuração), faz o hello da API 1.0, assina o status do OBD e envia os PIDs pelo `QueryObdDeviceRequest`. O protobuf dessas três mensagens é codificado à mão em `src/obd.js` (sem protobuf.js).
 4. O botão/gesto de voltar da central chama `history.back()` no app.
+5. Dentro do web view da central o app conecta sozinho à API (detecta o objeto `hudiy`), assina mídia, navegação e OBD, e mostra player e manobra. O YouTube Music tocando pelo Android Auto aparece no player; o Waze (ou Maps) em navegação aparece no card. Os botões do player injetam as teclas de mídia da central (`KeyEvent`).
+
+Por que só na central: nem o YouTube Music nem o Waze têm API pública para um site ler o que toca ou as instruções no celular. Essa informação só sai do telefone pelo protocolo do Android Auto, e é a central que a recebe. A integração foi validada contra um servidor falso que fala o protocolo do `Api.proto` (hello, assinaturas, mídia, navegação, OBD, teclas); falta o teste na central real.
 
 Limites: pela API do Hudiy só vão os PIDs padrão da ECU do motor (sem `ATSH`, então odômetro e contador de revisão do painel não são lidos por esse caminho). A central precisa de uma tela de 7" ou mais; o layout de tablet (768 px) é o que aparece.
 
@@ -84,6 +88,7 @@ src/car.js          modelo 3D e silhueta SVG com pontos de atenção
 vendor/             model-viewer e decodificador meshopt
 assets/asx.glb      modelo 3D preto (CC-BY-4.0, ver asx-LICENSE.txt)
 src/obd.js          decodificador OBDb, ISO-TP, DTCs, ELM327 BLE, simulador
+src/hudiy.js        cliente da API da central Hudiy (protobuf mínimo, mídia, navegação, OBD, teclas)
 src/signalset.js    sinais no formato OBDb v3
 sw.js               cache offline
 tests/              node --test
