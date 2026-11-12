@@ -80,7 +80,7 @@ Referência: diretrizes de design do Google para telas de carro (alvo de toque m
 | Formato | Para central dedicada |
 |---|---|
 | PWA no navegador | Não serve: sem Bluetooth clássico, sem controlar mídia de outros apps, sem detectar o carro |
-| **APK híbrido (casca nativa + interface web embutida)** | **Recomendado.** Reaproveita a interface e a lógica testada; o nativo cuida de tela inicial, quiosque, OBD, mídia, avisos e conectividade |
+| **APK híbrido (casca nativa + interface web embutida)** | **Recomendado.** Reaproveita a interface e a lógica testada; o nativo cuida do modo carro, OBD, mídia, avisos e conectividade |
 | APK todo nativo (Jetpack Compose) | Melhor desempenho e acessibilidade, mas reescreve tudo; só compensa se a WebView mostrar limite real no tablet |
 | Android Automotive OS | Exige hardware de montadora; não roda num tablet comum |
 | Raspberry Pi com Hudiy/Crankshaft | Feito para receber projeção do celular, o oposto do objetivo |
