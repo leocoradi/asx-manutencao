@@ -3,6 +3,7 @@ import { situacao, ordenar, consumo } from './plan.js';
 import { carro, carro3d, CARRO_3D } from './car.js';
 import { Elm327Ble, HudiyObd, Simulador, COMANDOS } from './obd.js';
 import { Hudiy, MSG, TECLA, mediaStatus, mediaMeta, navStatus, navDetalhes, navDistancia, imagemUrl } from './hudiy.js';
+import { alvoYoutube, wazeMapaUrl, wazeNavegarUrl, youtubeMusicUrl } from './media.js';
 
 // --- Estado e persistência (localStorage + backup JSON) ---
 const KEY = 'asx.v1';
@@ -67,6 +68,12 @@ function inicio() {
       ${nav.iconeUrl ? `<img src="${nav.iconeUrl}" alt="">` : ''}
       <div class="stack" style="flex:1"><div class="num dist">${esc(nav.distancia || '')}</div><div class="desc">${esc(nav.descricao || 'Navegando')}</div><small class="muted">Navegação via central (Android Auto)</small></div>
     </section>` : ''}
+    <section class="card dark full waze-card">
+      <div class="row"><h2 style="margin:0">Waze</h2><button class="btn-ghost btn-sm" data-action="pos">${pos ? 'Atualizar posição' : 'Minha posição'}</button></div>
+      ${pos ? `<iframe class="waze" src="${wazeMapaUrl(pos.lat, pos.lon)}" title="Mapa ao vivo do Waze" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>`
+            : '<p class="muted" style="margin:8px 0">Mapa ao vivo com o trânsito ao redor. Toque em "Minha posição" e permita a localização.</p>'}
+      <form data-form="waze" class="row" style="margin-top:10px;gap:8px"><input name="destino" placeholder="Para onde?" required aria-label="Destino" maxlength="200"><button class="btn-sm" type="submit" style="background:var(--fg);color:var(--bg)">Navegar</button></form>
+    </section>
     <section class="card dark">
       <h2>Odômetro</h2>
       <div class="row">
@@ -151,7 +158,7 @@ function combustivel() {
   return `
   <h1 style="margin:8px 0 12px">Combustível</h1>
   <div class="grid">
-    <section class="card">
+    <section class="card span-2">
       <h2>Novo abastecimento</h2>
       <form data-form="fuel">
         <div class="grid-2">
@@ -316,7 +323,7 @@ async function importar(file) {
 // --- Eventos ---
 function formDados(f) {
   const fd = new FormData(f);
-  return { data: fd.get('data'), km: +fd.get('km'), litros: +fd.get('litros'), valor: +fd.get('valor'), custo: +fd.get('custo') || 0, obs: (fd.get('obs') || '').trim(), cheio: fd.get('cheio') === 'on', itens: fd.getAll('itens') };
+  return { data: fd.get('data'), km: +fd.get('km'), litros: +fd.get('litros'), valor: +fd.get('valor'), custo: +fd.get('custo') || 0, obs: (fd.get('obs') || '').trim(), cheio: fd.get('cheio') === 'on', itens: fd.getAll('itens'), destino: (fd.get('destino') || '').trim(), url: (fd.get('url') || '').trim() };
 }
 function atualizaOdo(kmNovo, data) {
   if (kmNovo > S.odo.km) S.odo = { km: kmNovo, data: data > S.odo.data ? data : S.odo.data };
@@ -333,6 +340,13 @@ document.addEventListener('submit', (e) => {
   } else if (f.dataset.form === 'fuel') {
     S.fuel.push({ id: crypto.randomUUID(), data: d.data, km: d.km, litros: d.litros, valor: d.valor, cheio: d.cheio });
     atualizaOdo(d.km, d.data); toast('Abastecimento registrado.');
+  } else if (f.dataset.form === 'yt') {
+    const alvo = alvoYoutube(d.url);
+    if (!alvo) return toast('Link do YouTube não reconhecido.');
+    yt.alvo = alvo; localStorage.setItem('asx.yt', JSON.stringify(alvo)); yt.player?.destroy?.(); yt.player = null;
+    dlg.close(); renderPlayer(true); return;
+  } else if (f.dataset.form === 'waze') {
+    window.open(wazeNavegarUrl(d.destino), '_blank', 'noopener'); return;
   } else if (f.dataset.form === 'km') {
     S.odo = { km: d.km, data: hojeIso() }; toast('Odômetro atualizado.');
   }
@@ -353,6 +367,10 @@ document.addEventListener('click', (e) => {
     const k = a === 'apagar-log' ? 'log' : 'fuel';
     S[k] = S[k].filter((x) => x.id !== el.dataset.id); salvar(); render();
   }
+  else if (a === 'pos') localizar(true);
+  else if (a === 'yt-config') dlgYoutube();
+  else if (a === 'yt-abrir') { document.querySelector('.ytwrap')?.classList.toggle('aberto'); }
+  else if (a === 'yt-remover') { yt.alvo = null; localStorage.removeItem('asx.yt'); yt.player?.destroy?.(); yt.player = null; dlg.close(); renderPlayer(true); }
   else if (a === 'obd-ble') obdConectar(new Elm327Ble());
   else if (a === 'obd-hudiy') { conectarCentral(); obdConectar(new HudiyObd(central)); }
   else if (a === 'obd-sim') obdConectar(new Simulador());
@@ -402,23 +420,100 @@ function renderNav() {
   el.querySelector('.desc').textContent = nav.descricao || 'Navegando';
   const img = el.querySelector('img'); if (img && nav.iconeUrl) img.src = nav.iconeUrl;
 }
-function renderPlayer() {
+// --- Posição (mapa do Waze) ---
+let pos = (() => { try { const p = JSON.parse(localStorage.getItem('asx.pos')); return Number.isFinite(p?.lat) && Number.isFinite(p?.lon) ? p : null; } catch { return null; } })();
+function localizar(pedido) {
+  if (!navigator.geolocation) return toast('Sem geolocalização neste navegador.');
+  navigator.geolocation.getCurrentPosition((g) => {
+    pos = { lat: g.coords.latitude, lon: g.coords.longitude };
+    localStorage.setItem('asx.pos', JSON.stringify(pos));
+    const f = main.querySelector('iframe.waze'); if (f) f.src = wazeMapaUrl(pos.lat, pos.lon); else render();
+  }, (e) => { if (pedido) toast(e.code === 1 ? 'Permissão de localização negada.' : 'Não foi possível obter a posição.'); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+}
+// Atualiza a posição sem perguntar quando a permissão já foi dada.
+navigator.permissions?.query({ name: 'geolocation' }).then((p) => { if (p.state === 'granted') localizar(false); }).catch(() => {});
+
+// --- Player do YouTube (API oficial de iframe) no rodapé ---
+const yt = { alvo: (() => { try { return JSON.parse(localStorage.getItem('asx.yt')); } catch { return null; } })(), player: null, titulo: '', autor: '', tocando: false, api: null };
+function ytApi() {
+  return (yt.api ??= new Promise((res) => {
+    if (window.YT?.Player) return res(window.YT);
+    window.onYouTubeIframeAPIReady = () => res(window.YT);
+    document.head.append(Object.assign(document.createElement('script'), { src: 'https://www.youtube.com/iframe_api' }));
+  }));
+}
+function ytMontar() {
+  const alvo = yt.alvo; if (!alvo || !document.getElementById('yt')) return;
+  ytApi().then((YT) => {
+    if (!document.getElementById('yt')) return;
+    yt.player = new YT.Player('yt', {
+      width: '100%', height: '100%', videoId: alvo.video,
+      playerVars: { playsinline: 1, rel: 0, ...(alvo.list ? { listType: 'playlist', list: alvo.list } : {}) },
+      events: {
+        onReady: () => ytAtualizar(),
+        onStateChange: (e) => { yt.tocando = e.data === 1; ytAtualizar(); },
+        onError: () => toast('O YouTube não conseguiu tocar este item.'),
+      },
+    });
+  });
+}
+function ytAtualizar() {
+  const d = yt.player?.getVideoData?.() || {};
+  yt.titulo = d.title || ''; yt.autor = d.author || '';
   const el = document.getElementById('player');
-  if (central.conectado && midia.titulo) {
-    el.innerHTML = `
+  const t = el.querySelector('.t'); if (t) t.textContent = yt.titulo || 'YouTube';
+  const a = el.querySelector('.d'); if (a) a.textContent = yt.autor || (yt.alvo?.list ? 'Playlist' : '');
+  const b = el.querySelector('.play'); if (b) { b.textContent = yt.tocando ? '⏸' : '▶'; b.setAttribute('aria-label', yt.tocando ? 'Pausar' : 'Tocar'); }
+}
+function dlgYoutube() {
+  abrir(`<h2>YouTube Music</h2>
+  <p>Cole o link de uma playlist ou música do YouTube Music (ou YouTube). Playlists privadas não tocam fora do app do YouTube; use pública ou não listada.</p>
+  <form data-form="yt">
+    <label>Link<input name="url" inputmode="url" placeholder="https://music.youtube.com/playlist?list=…" required value="${yt.alvo ? esc(yt.alvo.list ? `https://music.youtube.com/playlist?list=${yt.alvo.list}` : `https://music.youtube.com/watch?v=${yt.alvo.video}`) : ''}"></label>
+    <div class="actions"><button type="submit">Salvar</button>${yt.alvo ? '<button type="button" class="btn-ghost" data-action="yt-remover">Remover</button>' : ''}<button type="button" class="btn-ghost" data-action="fechar">Cancelar</button></div>
+  </form>
+  <p class="muted"><small>Com a tela desligada o YouTube pausa a reprodução em navegadores; é regra da plataforma, não do app.</small></p>`);
+}
+let playerModo = '';
+function renderPlayer(forcar) {
+  const el = document.getElementById('player');
+  const modo = central.conectado && midia.titulo ? 'hudiy' : yt.alvo ? 'yt' : 'atalhos';
+  if (modo === 'yt' && playerModo === 'yt' && !forcar) return ytAtualizar();
+  playerModo = modo;
+  if (modo === 'hudiy') {
+    el.innerHTML = `<div class="barra">
       ${midia.capaUrl ? `<img class="capa" src="${midia.capaUrl}" alt="">` : '<div class="capa"></div>'}
       <div class="info"><div class="t">${esc(midia.titulo)}</div><div class="d">${esc(midia.artista)}${midia.posicao ? ` · ${esc(midia.posicao)} / ${esc(midia.duracao)}` : ''}</div></div>
       <div class="ctl">
         <button data-tecla="${TECLA.ANTERIOR}" aria-label="Faixa anterior">⏮</button>
         <button class="play" data-tecla="${TECLA.TOGGLE_PLAY}" aria-label="${midia.tocando ? 'Pausar' : 'Tocar'}">${midia.tocando ? '⏸' : '▶'}</button>
         <button data-tecla="${TECLA.PROXIMA}" aria-label="Próxima faixa">⏭</button>
-      </div>`;
-  } else if (window.hudiy) el.innerHTML = '';
-  else el.innerHTML = `
-      <a class="atalho" href="https://music.youtube.com/" target="_blank" rel="noopener"><i></i>YouTube Music</a>
-      <a class="atalho waze" href="https://waze.com/ul?navigate=yes" target="_blank" rel="noopener"><i></i>Waze</a>
-      <small class="muted" style="margin-left:auto">Player e manobras aparecem na central Hudiy</small>`;
+      </div></div>`;
+  } else if (modo === 'yt') {
+    el.innerHTML = `<div class="ytwrap"><div id="yt"></div></div>
+      <div class="barra">
+        <button class="capa" data-action="yt-abrir" aria-label="Mostrar ou esconder o vídeo"><i></i></button>
+        <div class="info"><div class="t">YouTube</div><div class="d">${yt.alvo.list ? 'Playlist' : ''}</div></div>
+        <div class="ctl">
+          <button data-yt="anterior" aria-label="Faixa anterior">⏮</button>
+          <button class="play" data-yt="toggle" aria-label="Tocar">▶</button>
+          <button data-yt="proxima" aria-label="Próxima faixa">⏭</button>
+          <button data-action="yt-config" aria-label="Trocar playlist">⋯</button>
+        </div></div>`;
+    ytMontar();
+  } else {
+    el.innerHTML = `<div class="barra">
+      <button class="atalho" data-action="yt-config"><i></i>Tocar YouTube Music aqui</button>
+      <a class="atalho app" href="${youtubeMusicUrl}" target="_blank" rel="noopener">Abrir app</a></div>`;
+  }
 }
+document.getElementById('player').addEventListener('click', (e) => {
+  const y = e.target.closest('[data-yt]'); if (!y || !yt.player) return;
+  const acao = y.dataset.yt;
+  if (acao === 'anterior') yt.player.previousVideo();
+  else if (acao === 'proxima') yt.player.nextVideo();
+  else if (yt.tocando) yt.player.pauseVideo(); else yt.player.playVideo();
+});
 document.getElementById('player').addEventListener('click', (e) => { const b = e.target.closest('[data-tecla]'); if (b) central.tecla(+b.dataset.tecla); });
 renderPlayer();
 if (window.hudiy) conectarCentral();

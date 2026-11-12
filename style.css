@@ -48,8 +48,9 @@ small { font-size: 12px; }
 .nav a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible { outline: 2px dashed var(--red); outline-offset: 2px; }
 
 .main { grid-area: main; padding: 4px var(--pad) 24px; max-width: 1200px; width: 100%; margin: 0 auto; }
-.grid { display: grid; gap: 12px; grid-template-columns: 1fr; }
-.grid-2 { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+.grid { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+.grid-2 { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid .full { grid-column: 1 / -1; }
 
 .card { background: var(--card); color: var(--card-fg); border-radius: var(--r); padding: 16px; }
 .card.dark { background: var(--bg-2); color: var(--fg); border: 1px dashed var(--line); }
@@ -109,8 +110,16 @@ dialog::backdrop { background: rgba(0,0,0,.7); }
 dialog h2 { margin-top: 0; }
 
 /* Player (rodapé) e navegação */
-.player { grid-area: player; background: var(--bg); border-top: 1px dashed var(--line); padding: 8px var(--pad); display: flex; align-items: center; gap: 12px; min-height: 64px; min-width: 0; overflow: hidden; position: sticky; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom)); z-index: 4; }
+.player { grid-area: player; background: var(--bg); border-top: 1px dashed var(--line); display: flex; flex-direction: column; min-width: 0; overflow: hidden; position: sticky; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom)); z-index: 4; }
 .player:empty { display: none; }
+.player .barra { display: flex; align-items: center; gap: 12px; padding: 8px var(--pad); min-height: 64px; min-width: 0; }
+.ytwrap { height: 0; overflow: hidden; transition: height .25s; background: #000; }
+.ytwrap.aberto { height: min(56vw, 320px); }
+.ytwrap iframe, .ytwrap #yt { width: 100%; height: 100%; border: 0; display: block; }
+.player button.capa { display: flex; align-items: center; justify-content: center; padding: 0; min-height: 0; cursor: pointer; }
+.player button.capa i { width: 0; height: 0; border-left: 14px solid var(--red); border-top: 9px solid transparent; border-bottom: 9px solid transparent; margin-left: 4px; }
+.player .atalho.app { margin-left: auto; }
+iframe.waze { width: 100%; aspect-ratio: 16 / 10; max-height: 360px; border: 0; border-radius: 12px; background: var(--bg-2); display: block; }
 .player .capa { width: 48px; height: 48px; border-radius: 10px; background: var(--bg-2); object-fit: cover; flex: none; border: 1px dashed var(--line); }
 .player .info { flex: 1; min-width: 0; overflow: hidden; }
 .player .t, .player .d { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -172,7 +181,7 @@ dialog h2 { margin-top: 0; }
   .nav a { padding: 10px 6px; }
   .main { padding: 8px 32px 40px; }
   .top { padding: 20px 32px 8px; }
-  .grid { grid-template-columns: 1fr 1fr; }
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tiles { grid-template-columns: repeat(3, 1fr); }
   .car3d { aspect-ratio: 16 / 8; }
 }
@@ -180,9 +189,40 @@ dialog h2 { margin-top: 0; }
 @media (min-width: 1100px) {
   body { grid-template-columns: 200px 1fr; }
   .nav a { flex-direction: row; gap: 10px; font-size: 14px; padding: 10px 14px; justify-content: flex-start; }
-  .grid { grid-template-columns: repeat(3, 1fr); }
+  .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .grid .span-2 { grid-column: span 2; }
   .tiles { grid-template-columns: repeat(4, 1fr); }
   .big { font-size: 56px; }
 }
 @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+
+/* Celular deitado: pouca altura. Cabeçalho, trilho e player compactos; três colunas; mapa e carro limitados. */
+@media (orientation: landscape) and (max-height: 520px) and (min-width: 640px) {
+  body { grid-template-columns: 72px 1fr; grid-template-rows: auto 1fr auto; grid-template-areas: 'nav top' 'nav main' 'nav player'; }
+  .top { padding: 8px 20px 2px; }
+  .brand { flex-direction: row; align-items: baseline; gap: 10px; }
+  .brand .dot-title { font-size: 18px; }
+  .icon-btn { min-height: 36px; min-width: 36px; }
+  .nav { flex-direction: column; justify-content: flex-start; gap: 2px; border-top: 0; border-right: 1px dashed var(--line); padding: 8px 4px; height: 100dvh; position: sticky; top: 0; }
+  .nav a { flex-direction: column; padding: 6px 2px; font-size: 10px; gap: 1px; min-width: 0; border-radius: 10px; }
+  .nav a svg { width: 20px; height: 20px; }
+  .main { padding: 4px 20px 16px; }
+  h1 { font-size: 20px; margin: 2px 0 6px !important; }
+  h2 { margin: 12px 0 6px; }
+  .card { padding: 12px 14px; }
+  .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-flow: dense; gap: 10px; }
+  .grid .span-2 { grid-column: span 2; }
+  .grid .waze-card { grid-column: span 1; }
+  iframe.waze { aspect-ratio: 4 / 3; max-height: 170px; }
+  .car3d { aspect-ratio: 16 / 7; max-height: 190px; }
+  .big { font-size: 30px; }
+  .card .row { flex-wrap: wrap; row-gap: 6px; }
+  .card form.row { flex-wrap: nowrap; } .card form.row input { min-width: 0; }
+  .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .tile { padding: 10px 12px; } .tile .v { font-size: 26px; }
+  .player .barra { min-height: 52px; padding: 4px 16px; gap: 10px; }
+  .player .capa { width: 40px; height: 40px; }
+  .player .ctl button { min-width: 40px; min-height: 40px; }
+  .ytwrap.aberto { height: 60dvh; }
+  dialog { max-height: 94dvh; }
+}
