@@ -331,8 +331,37 @@ function dlgConfig() {
     <div class="actions"><button type="submit" class="btn-sm">Salvar chave</button></div>
   </form>
   <p class="muted"><small>Crie no console do Google Cloud com as APIs "Maps JavaScript API" e "Routes API" ativas e restrinja a chave ao domínio deste app. Uso pessoal cabe na cota gratuita.</small></p>
+  <h2 style="margin-top:20px">Atualização</h2>
+  <p class="muted" style="margin:0"><small>${window.AsxNative?.versaoApp ? `App versão ${esc(window.AsxNative.versaoApp())}. ` : ''}A página se atualiza sozinha quando há internet; o botão força a versão mais nova${window.AsxNative?.procurarAtualizacao ? ' e procura um APK novo' : ''}.</small></p>
+  <div class="actions"><button data-action="atualizar">Procurar atualização</button></div>
+  <p class="atualiza" aria-live="polite" style="margin:8px 0 0"></p>
   <h2 style="margin-top:20px">Apagar tudo</h2>
   <div class="actions"><button class="btn-red" data-action="zerar">Apagar todos os registros</button><button class="btn-ghost" data-action="fechar">Fechar</button></div>`);
+}
+// Força a versão mais nova da página: busca o service worker novo, apaga o cache offline e recarrega.
+async function atualizarWeb() {
+  const el = dlg.querySelector('.atualiza'); if (el) el.textContent = 'Recarregando a versão mais nova…';
+  try {
+    await (await navigator.serviceWorker?.getRegistration())?.update();
+    for (const k of await caches.keys()) await caches.delete(k);
+  } catch {}
+  location.reload();
+}
+// Respostas do Atualizador nativo (APK).
+function atualizacao(e) {
+  const instalar = '<button class="btn-sm claro" data-action="atualizar-instalar">Baixar e instalar</button>';
+  const html = {
+    procurando: 'Procurando…',
+    atual: `O app já está na versão mais nova (${esc(e.versao)}). Recarregando a página…`,
+    disponivel: `Versão ${esc(e.versao)} disponível (você tem a ${esc(e.atual)}). ${instalar}`,
+    permissao: `Permita “Instalar apps desconhecidos” para o ASX e toque de novo. ${instalar}`,
+    baixando: `Baixando… ${e.pct >= 0 ? e.pct + '%' : ''}`,
+    instalando: 'Confirme a instalação na janela do Android.',
+    erro: esc(e.msg),
+  }[e.estado] ?? '';
+  const el = dlg.open && dlg.querySelector('.atualiza');
+  if (el) el.innerHTML = html; else if (e.estado === 'disponivel' || e.estado === 'erro') toast(e.estado === 'erro' ? e.msg : `Versão ${e.versao} disponível: engrenagem → Procurar atualização.`);
+  if (e.estado === 'atual') setTimeout(atualizarWeb, 1200);
 }
 function exportar() {
   const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' })), download: `asx-backup-${hojeIso()}.json` });
@@ -390,6 +419,8 @@ document.addEventListener('click', (e) => {
   else if (a === 'ir') location.hash = `#/manutencao?area=${el.dataset.area}`;
   else if (a === 'fechar') dlg.close();
   else if (a === 'exportar') exportar();
+  else if (a === 'atualizar') { if (window.AsxNative?.procurarAtualizacao) window.AsxNative.procurarAtualizacao(); else atualizarWeb(); }
+  else if (a === 'atualizar-instalar') window.AsxNative.instalarAtualizacao();
   else if (a === 'zerar') { if (confirm('Apagar todos os registros deste aparelho? Exporte um backup antes.')) { S = vazio(); salvar(); dlg.close(); render(); } }
   else if (a === 'apagar-log' || a === 'apagar-fuel') {
     if (!confirm('Apagar este registro?')) return;
@@ -550,7 +581,10 @@ function celAplicar(e) {
   erroGuia = cel.guia?.erro || '';
   renderPlayer(); renderWidgets(); atualizarManobra();
 }
-window.asxNativo = { evento: (json) => { try { celAplicar(typeof json === 'string' ? JSON.parse(json) : json); } catch (err) { console.error(err); } } };
+window.asxNativo = {
+  evento: (json) => { try { celAplicar(typeof json === 'string' ? JSON.parse(json) : json); } catch (err) { console.error(err); } },
+  atualizacao: (json) => { try { atualizacao(typeof json === 'string' ? JSON.parse(json) : json); } catch (err) { console.error(err); } },
+};
 function celSincronizar() { if (window.AsxNative) { try { celAplicar(JSON.parse(window.AsxNative.estado())); } catch {} } }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) celSincronizar(); });
 

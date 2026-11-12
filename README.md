@@ -47,7 +47,15 @@ O APK é uma casca fina em Kotlin (`android/`): uma WebView com o app publicado 
 
 Instalação: baixe `asx-manutencao.apk`, instale (permitir fontes desconhecidas) e, no rodapé, toque em **Permitir** para dar "Acesso a notificações" ao app. Sem isso, mídia, manobras e avisos não aparecem.
 
-Onde baixar: sem a chave do Google, no artefato do workflow **Android** (aba Actions). Com a chave, em **Releases**, no rascunho "APK com mapa nativo (privado)", visível só para quem tem acesso de escrita ao repositório. O APK com chave não vai para o artefato porque artefatos de repositório público podem ser baixados por qualquer conta do GitHub.
+Onde baixar: em **Releases**, na versão mais nova ("App 1.N"). Cada build do `main` que mexe em `android/` publica uma.
+
+### Atualizar
+
+- **Página** (telas, estilos, lógica): atualiza sozinha. O app sempre confere os arquivos com o servidor ao abrir.
+- **APK** (parte nativa): engrenagem → **Procurar atualização**. O app consulta a release mais nova; se houver, mostra **Baixar e instalar**, baixa o APK e o Android pede confirmação. Na primeira vez o Android pede para permitir "Instalar apps desconhecidos" para o ASX. Sem APK novo, o botão recarrega a página na versão mais nova.
+- Todos os APKs são assinados pela mesma chave, guardada pelo CI num **rascunho de release "assinatura"**. Não apague nem publique esse rascunho: sem ele, o app instalado deixa de aceitar atualizações.
+- APKs instalados antes da versão com o botão foram assinados com chaves descartáveis. Para a primeira instalação com a chave fixa: exporte o backup, desinstale o app antigo, instale o novo e importe o backup. Daí em diante, o botão resolve.
+- Com o secret `MAPS_API_KEY` configurado, o APK vai para o rascunho "APK com mapa nativo (privado)" e não é publicado, então o botão não o encontra.
 
 ### Mapa nativo (Navigation SDK)
 
@@ -58,8 +66,6 @@ Onde baixar: sem a chave do Google, no artefato do workflow **Android** (aba Act
 5. Rode o workflow **Android**. O APK sai no rascunho de release.
 
 Uso: na aba Navegação, digite o destino e toque em **Ir**. Na primeira vez o Google mostra os termos de uso. O endereço vira coordenada pelo Geocoder do Android, sem custo; cada destino pedido conta 1 na cota do Navigation SDK.
-
-Assinatura: sem keystore próprio, cada build é assinado com uma chave de debug nova e atualizar exige desinstalar antes (os registros ficam no app; exporte o backup). Para assinatura estável e para poder restringir a chave do Google ao pacote `br.asx.manutencao`, cadastre os secrets `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_SENHA`, `ANDROID_CHAVE` e `ANDROID_CHAVE_SENHA`.
 
 Numa central multimídia Android, instale o APK e defina como tela inicial.
 

@@ -8,7 +8,13 @@ import java.util.Locale
 
 // Exposta ao web app como window.AsxNative. Os métodos rodam fora da thread principal.
 class Ponte(private val act: MainActivity) {
-    @JavascriptInterface fun versao(): Int = 2
+    @JavascriptInterface fun versao(): Int = 3
+
+    @JavascriptInterface fun versaoApp(): String = BuildConfig.VERSION_NAME
+
+    // Atualização do APK: o resultado chega em window.asxNativo.atualizacao(estado).
+    @JavascriptInterface fun procurarAtualizacao() { Atualizador.verificar() }
+    @JavascriptInterface fun instalarAtualizacao() { act.runOnUiThread { Atualizador.instalar(act) } }
 
     @JavascriptInterface fun temAcesso(): Boolean = NotificacoesService.ativo(act)
 

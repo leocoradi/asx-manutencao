@@ -87,6 +87,7 @@ class MainActivity : Activity() {
         tts = TextToSpeech(this) { st -> if (st == TextToSpeech.SUCCESS) { tts?.language = Locale("pt", "BR"); ttsPronto = true } }
 
         Estado.ouvinte = { json -> runOnUiThread { web.evaluateJavascript("window.asxNativo && window.asxNativo.evento($json)", null) } }
+        Atualizador.ouvinte = { json -> runOnUiThread { web.evaluateJavascript("window.asxNativo && window.asxNativo.atualizacao && window.asxNativo.atualizacao($json)", null) } }
         if (savedInstanceState == null) web.loadUrl(base.toString()) else web.restoreState(savedInstanceState)
     }
 
@@ -139,6 +140,7 @@ class MainActivity : Activity() {
     override fun onStop() { mapa?.view?.onStop(); super.onStop() }
     override fun onDestroy() {
         Estado.ouvinte = null
+        Atualizador.ouvinte = null
         tts?.shutdown()
         mapa?.destruir()
         super.onDestroy()

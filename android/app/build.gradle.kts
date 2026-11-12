@@ -5,8 +5,8 @@ plugins {
     id("com.android.application")
 }
 
-// Assinatura: keystore vindo do CI (variáveis ASX_KEYSTORE, ASX_KEYSTORE_SENHA, ASX_CHAVE, ASX_CHAVE_SENHA);
-// sem ele, usa a chave de debug. Trocar de chave exige desinstalar o app antes de atualizar.
+// Assinatura: keystore fixo vindo do CI (variáveis ASX_KEYSTORE, ASX_KEYSTORE_SENHA, ASX_CHAVE, ASX_CHAVE_SENHA);
+// sem ele (build local), usa a chave de debug da máquina, que não atualiza um app instalado pelo CI.
 val keystore = System.getenv("ASX_KEYSTORE")?.let { File(it) }?.takeIf { it.exists() }
 
 // Chave do Google para o Navigation SDK: vem do secret MAPS_API_KEY no CI e nunca entra no repositório.
@@ -21,8 +21,10 @@ android {
         applicationId = "br.asx.manutencao"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1"
+        // Número do build no GitHub Actions: cresce a cada build e é o que o botão "Procurar atualização" compara.
+        val build = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+        versionCode = build
+        versionName = "1.$build"
         manifestPlaceholders["MAPS_API_KEY"] = chaveMaps.ifEmpty { "SEM_CHAVE" }
         buildConfigField("boolean", "TEM_NAV", chaveMaps.isNotEmpty().toString())
     }
