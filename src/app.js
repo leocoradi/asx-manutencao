@@ -1,7 +1,7 @@
 import { VEICULO, AREAS, PLANO, FLUIDOS, FICHA, PNEUS, LAMPADAS, FUSIVEIS } from './data.js';
 import { situacao, ordenar, consumo } from './plan.js';
 import { carro, carro3d, CARRO_3D } from './car.js';
-import { Elm327Ble, Simulador, COMANDOS } from './obd.js';
+import { Elm327Ble, HudiyObd, Simulador, COMANDOS } from './obd.js';
 
 // --- Estado e persistência (localStorage + backup JSON) ---
 const KEY = 'asx.v1';
@@ -213,10 +213,10 @@ function obdView() {
   <section class="card dark">
     <div class="row" style="flex-wrap:wrap">
       <div class="stack"><span class="t">${on ? `Conectado: ${esc(obd.tx.nome)}` : 'Desconectado'}</span>
-        <small class="muted">ELM327 Bluetooth LE (Vgate iCar Pro BLE, OBDLink CX…) via Chrome no Android. Adaptadores Bluetooth clássico (SPP) não funcionam no navegador.</small></div>
+        <small class="muted">Bluetooth: ELM327 BLE (Vgate iCar Pro BLE, OBDLink CX…) via Chrome no Android; adaptadores SPP não funcionam no navegador. Central Hudiy: o ELM327 ligado à central, pela API local.</small></div>
       <div class="actions" style="margin:0">
         ${on ? '<button class="btn-red btn-sm" data-action="obd-off">Desconectar</button>'
-             : '<button class="btn-sm" style="background:var(--fg);color:var(--bg)" data-action="obd-ble">Conectar Bluetooth</button><button class="btn-ghost btn-sm" data-action="obd-sim">Simular</button>'}
+             : `<button class="btn-sm" style="background:var(--fg);color:var(--bg)" data-action="obd-ble">Conectar Bluetooth</button><button class="btn-ghost btn-sm" data-action="obd-hudiy">Central Hudiy</button><button class="btn-ghost btn-sm" data-action="obd-sim">Simular</button>`}
       </div>
     </div>
   </section>
@@ -233,7 +233,7 @@ function obdView() {
 async function obdConectar(tx) {
   try {
     await tx.conectar();
-    obd.tx = tx; obd.valores = {}; obd.dtcs = null;
+    obd.tx = tx; obd.valores = {}; obd.dtcs = null; tx.onStatus = logObd;
     logObd(`Conectado a ${tx.nome}`);
     render();
     obdPoll();
@@ -256,7 +256,7 @@ async function obdPoll() {
   obd.timer = setTimeout(obdPoll, 1000);
 }
 function obdDesconectar() {
-  clearTimeout(obd.timer); obd.tx = null; obd.valores = {}; logObd('Desconectado'); render();
+  clearTimeout(obd.timer); obd.tx?.desconectar?.(); obd.tx = null; obd.valores = {}; logObd('Desconectado'); render();
 }
 
 // --- Diálogos ---
@@ -348,6 +348,7 @@ document.addEventListener('click', (e) => {
     S[k] = S[k].filter((x) => x.id !== el.dataset.id); salvar(); render();
   }
   else if (a === 'obd-ble') obdConectar(new Elm327Ble());
+  else if (a === 'obd-hudiy') obdConectar(new HudiyObd());
   else if (a === 'obd-sim') obdConectar(new Simulador());
   else if (a === 'obd-off') obdDesconectar();
   else if (a === 'obd-dtc') obd.tx.dtcs().then((d) => { obd.dtcs = d; logObd(`DTCs: ${d.join(', ') || 'nenhum'}`); render(); }).catch((err) => toast(err.message));
@@ -386,4 +387,6 @@ function render() {
 }
 window.addEventListener('hashchange', () => { render(); main.focus({ preventScroll: true }); window.scrollTo(0, 0); });
 render();
+// Dentro da central Hudiy: tecla/gesto de voltar do web view.
+if (window.hudiy) window.hudiy.onGoBack = () => history.back();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

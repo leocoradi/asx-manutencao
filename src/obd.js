@@ -157,6 +157,109 @@ export class Elm327Ble {
   }
 }
 
+// --- Transporte Hudiy (central multimídia Linux, https://github.com/wiboma/hudiy) ---
+// A central cuida do ELM327 (Bluetooth ou USB) e expõe a API em WebSocket (porta padrão 44406) com
+// quadros de 3×uint32 LE (tamanho, id, reservado) + protobuf. Só os 3 tipos de mensagem usados aqui são
+// codificados à mão, em vez de carregar o protobuf.js e o Api.proto.
+const HUDIY = { HELLO: 1, HELLO_RESP: 2, SUBS: 3, OBD_STATUS: 23, OBD_REQ: 24, OBD_RESP: 25, PING: 47, PONG: 48 };
+
+function varint(n) { const out = []; while (n > 127) { out.push((n & 127) | 128); n >>>= 7; } out.push(n); return out; }
+function campoBytes(tag, bytes) { return [(tag << 3) | 2, ...varint(bytes.length), ...bytes]; }
+const campoStr = (tag, s) => campoBytes(tag, [...new TextEncoder().encode(s)]);
+const campoInt = (tag, n) => [(tag << 3) | 0, ...varint(n)];
+
+// Decodifica campos simples (varint e bytes) em { tag: [valores] }.
+export function protoCampos(bytes) {
+  const out = {}; let i = 0;
+  const lerVarint = () => { let v = 0, s = 0, b; do { b = bytes[i++]; v += (b & 127) * 2 ** s; s += 7; } while (b & 128); return v; };
+  while (i < bytes.length) {
+    const chave = lerVarint(), tag = chave >> 3, tipo = chave & 7;
+    let v;
+    if (tipo === 0) v = lerVarint();
+    else if (tipo === 2) { const n = lerVarint(); v = bytes.slice(i, i + n); i += n; }
+    else if (tipo === 1) { i += 8; continue; } else if (tipo === 5) { i += 4; continue; } else break;
+    (out[tag] ??= []).push(v);
+  }
+  return out;
+}
+
+export function quadroHudiy(id, payload) {
+  const b = new Uint8Array(12 + payload.length);
+  new DataView(b.buffer).setUint32(0, payload.length, true);
+  new DataView(b.buffer).setUint32(4, id, true);
+  b.set(payload, 12);
+  return b;
+}
+export function lerQuadroHudiy(buf) {
+  const v = new DataView(buf);
+  return { id: v.getUint32(4, true), payload: new Uint8Array(buf.slice(12, 12 + v.getUint32(0, true))) };
+}
+export const hudiyHello = (nome) => new Uint8Array([...campoStr(1, nome), ...campoBytes(2, [...campoInt(1, 1), ...campoInt(2, 0)])]);
+export const hudiyObdReq = (cmds, codigo) => new Uint8Array([...cmds.flatMap((c) => campoStr(1, c)), ...campoInt(2, codigo)]);
+export function hudiyObdResp(payload) {
+  const c = protoCampos(payload);
+  return { ok: c[1]?.[0] === 1, dados: (c[2] ?? []).map((b) => new TextDecoder().decode(b)), codigo: c[3]?.[0] };
+}
+
+export class HudiyObd {
+  #ws; #pendentes = new Map(); #codigo = 0;
+  nome = 'Hudiy';
+  constructor(url = 'ws://localhost:44406') { this.url = url; }
+
+  conectar() {
+    return new Promise((res, rej) => {
+      let ws;
+      try { ws = new WebSocket(this.url); } catch (e) { return rej(new Error('Hudiy não acessível: ' + e.message)); }
+      ws.binaryType = 'arraybuffer';
+      const t = setTimeout(() => { ws.close(); rej(new Error('Hudiy não respondeu ao hello.')); }, 4000);
+      ws.onerror = () => rej(new Error('Sem conexão com a API do Hudiy em ' + this.url));
+      ws.onclose = () => { for (const p of this.#pendentes.values()) p.rej(new Error('Hudiy desconectou')); this.#pendentes.clear(); };
+      ws.onopen = () => ws.send(quadroHudiy(HUDIY.HELLO, hudiyHello('ASX Manutenção')));
+      ws.onmessage = (e) => {
+        const { id, payload } = lerQuadroHudiy(e.data);
+        if (id === HUDIY.PING) ws.send(quadroHudiy(HUDIY.PONG, new Uint8Array(0)));
+        else if (id === HUDIY.HELLO_RESP) {
+          clearTimeout(t);
+          if (protoCampos(payload)[3]?.[0] !== 1) return rej(new Error('Hudiy recusou a versão da API.'));
+          ws.send(quadroHudiy(HUDIY.SUBS, new Uint8Array(campoInt(1, 4)))); // Subscription.OBD
+          this.#ws = ws; res();
+        } else if (id === HUDIY.OBD_STATUS) { if (protoCampos(payload)[1]?.[0] === 2) this.onStatus?.('ELM327 desconectado do carro'); }
+        else if (id === HUDIY.OBD_RESP) {
+          const r = hudiyObdResp(payload);
+          const p = this.#pendentes.get(r.codigo); this.#pendentes.delete(r.codigo);
+          p?.res(r);
+        }
+      };
+    });
+  }
+
+  #pedir(cmds) {
+    return new Promise((res, rej) => {
+      if (!this.#ws || this.#ws.readyState !== 1) return rej(new Error('Hudiy desconectado'));
+      const codigo = ++this.#codigo;
+      const t = setTimeout(() => { this.#pendentes.delete(codigo); rej(new Error('Hudiy: sem resposta')); }, 5000);
+      this.#pendentes.set(codigo, { res: (r) => { clearTimeout(t); res(r); }, rej });
+      this.#ws.send(quadroHudiy(HUDIY.OBD_REQ, hudiyObdReq(cmds, codigo)));
+    });
+  }
+
+  // O Hudiy devolve a resposta sem cabeçalho (ex.: "410D74"); só os PIDs padrão da ECU 7E0 são consultados.
+  async consultar(cmd) {
+    if (cmd.hdr !== '7E0') return null;
+    const r = await this.#pedir([comandoTexto(cmd)]);
+    if (!r.ok || !r.dados[0]) return null;
+    return decodificarResposta(cmd, '7E8' + (r.dados[0].length / 2).toString(16).padStart(2, '0') + r.dados[0]);
+  }
+
+  async dtcs() {
+    const r = await this.#pedir(['03']);
+    if (!r.ok || !r.dados[0]) return [];
+    return decodificarDtcs(r.dados[0].match(/../g).map((h) => parseInt(h, 16)));
+  }
+
+  desconectar() { this.#ws?.close(); }
+}
+
 // --- Simulador: mesmos métodos, valores plausíveis para demonstrar a tela sem adaptador ---
 export class Simulador {
   nome = 'Simulador';
