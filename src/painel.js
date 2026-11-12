@@ -28,11 +28,3 @@ export function manobraDeNotificacao(n) {
 }
 
 export const mmss = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
-
-// 754 s, 5230 m -> "13 min · 5,2 km"
-export function tempoDistancia(segundos, metros) {
-  const min = Math.max(1, Math.round(segundos / 60));
-  const t = min >= 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min`;
-  const d = metros >= 1000 ? `${(metros / 1000).toFixed(1).replace('.', ',')} km` : `${Math.round(metros / 10) * 10} m`;
-  return `${t} · ${d}`;
-}

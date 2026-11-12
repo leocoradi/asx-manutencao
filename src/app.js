@@ -4,7 +4,7 @@ import { carro, carro3d, CARRO_3D } from './car.js';
 import { Elm327Ble, HudiyObd, Simulador, COMANDOS } from './obd.js';
 import { Hudiy, MSG, TECLA, mediaStatus, mediaMeta, navStatus, navDetalhes, navDistancia, imagemUrl } from './hudiy.js';
 import { carregarGoogle, MapaTransito, linksNavegar } from './mapa.js';
-import { analisarHash, manobraDeNotificacao, mmss, tempoDistancia } from './painel.js';
+import { analisarHash, manobraDeNotificacao, mmss } from './painel.js';
 
 // --- Estado e persistência (localStorage + backup JSON) ---
 const KEY = 'asx.v1';
@@ -104,20 +104,18 @@ function inicio() {
 }
 
 function navegacao() {
-  const nativo = navNativo();
   return `
   <div class="nav-view">
-    <section class="mapa-area${nativo ? ' nativo' : ''}">
+    <section class="mapa-area">
       <div class="manobra-slot" aria-live="polite">${manobraHtml()}</div>
-      ${nativo ? '<div class="mapa-box nativo" id="mapa-nativo" role="region" aria-label="Mapa de navegação"></div>'
-        : gm.chave ? '<div class="mapa-box gmapa" id="gmapa" role="region" aria-label="Mapa do Google com trânsito ao vivo"></div>'
+      ${gm.chave ? '<div class="mapa-box gmapa" id="gmapa" role="region" aria-label="Mapa do Google com trânsito ao vivo"></div>'
         : '<div class="mapa-box vazio"><p class="muted" style="margin:0">Mapa do Google com trânsito ao vivo e rota com tempo real.</p><button class="btn-ghost btn-sm" data-action="gm-config">Configurar chave do Google Maps</button></div>'}
       <form data-form="rota" class="row destino">
         <input name="destino" placeholder="Para onde?" required aria-label="Destino" maxlength="200" value="${esc(gm.destino)}">
-        <button class="btn-sm claro" type="submit">${nativo ? 'Ir' : gm.chave ? 'Rota' : 'Navegar'}</button>
-        ${nativo ? '' : `<button class="btn-ghost btn-sm" type="button" data-action="pos" aria-label="${pos ? 'Atualizar minha posição' : 'Usar minha posição'}">◎</button>`}
+        <button class="btn-sm claro" type="submit">${gm.chave ? 'Rota' : 'Navegar'}</button>
+        <button class="btn-ghost btn-sm" type="button" data-action="pos" aria-label="${pos ? 'Atualizar minha posição' : 'Usar minha posição'}">◎</button>
       </form>
-      <div class="rota-info">${nativo ? guiaHtml() : rotaHtml()}</div>
+      <div class="rota-info">${rotaHtml()}</div>
     </section>
     <section class="w-midia card dark" aria-label="Mídia"></section>
     <section class="w-avisos card dark" aria-label="Avisos"></section>
@@ -293,7 +291,7 @@ function obdDesconectar() {
 }
 
 // --- Diálogos ---
-function abrir(html) { dlg.innerHTML = html; dlg.showModal(); sincronizarMapaNativo(); }
+function abrir(html) { dlg.innerHTML = html; dlg.showModal(); }
 function dlgRegistrar(itemId) {
   abrir(`<h2>Registrar serviço</h2>
   <form data-form="log">
@@ -318,6 +316,18 @@ function dlgKm() {
     <div class="actions"><button type="submit">Salvar</button><button type="button" class="btn-ghost" data-action="fechar">Cancelar</button></div>
   </form>`);
 }
+function carroConfigHtml() {
+  const c = cel.carro || {}, livre = window.AsxNative.bateriaLivre?.();
+  return `<h2 style="margin-top:20px">Modo carro</h2>
+  <p class="muted" style="margin:0"><small>Liga sozinho quando o tablet conecta ao áudio Bluetooth do carro, e pelo botão do carro no topo. No modo carro: paisagem, tela cheia, tela sempre acesa e Voltar não fecha o app.</small></p>
+  <p style="margin:8px 0 0">Carro: <b>${esc(c.salvo || 'nenhum escolhido')}</b>${c.audio ? ` · áudio conectado agora: ${esc(c.audio)}` : ''}</p>
+  <div class="actions">
+    ${c.audio && c.audio !== c.salvo ? `<button class="btn-sm" data-action="carro-lembrar" data-nome="${esc(c.audio)}">Usar “${esc(c.audio)}” como o carro</button>` : ''}
+    ${c.salvo ? '<button class="btn-ghost btn-sm" data-action="carro-esquecer">Esquecer o carro</button>' : ''}
+    ${livre === false ? '<button class="btn-ghost btn-sm" data-action="bateria">Liberar uso de bateria</button>' : ''}
+  </div>
+  ${!c.audio && !c.salvo ? '<p class="muted" style="margin:6px 0 0"><small>Para escolher o carro, conecte o tablet ao Bluetooth do rádio e volte aqui.</small></p>' : ''}`;
+}
 function dlgConfig() {
   abrir(`<h2>Backup</h2>
   <p>Os dados ficam só neste aparelho. Exporte um JSON de vez em quando e importe em outro aparelho.</p>
@@ -331,6 +341,7 @@ function dlgConfig() {
     <div class="actions"><button type="submit" class="btn-sm">Salvar chave</button></div>
   </form>
   <p class="muted"><small>Crie no console do Google Cloud com as APIs "Maps JavaScript API" e "Routes API" ativas e restrinja a chave ao domínio deste app. Uso pessoal cabe na cota gratuita.</small></p>
+  ${window.AsxNative?.modoCarro ? carroConfigHtml() : ''}
   <h2 style="margin-top:20px">Atualização</h2>
   <p class="muted" style="margin:0"><small>${window.AsxNative?.versaoApp ? `App versão ${esc(window.AsxNative.versaoApp())}. ` : ''}A página se atualiza sozinha quando há internet; o botão força a versão mais nova${window.AsxNative?.procurarAtualizacao ? ' e procura um APK novo' : ''}.</small></p>
   <div class="actions"><button data-action="atualizar">Procurar atualização</button></div>
@@ -340,7 +351,7 @@ function dlgConfig() {
 }
 // Força a versão mais nova da página: busca o service worker novo, apaga o cache offline e recarrega.
 async function atualizarWeb() {
-  const el = dlg.querySelector('.atualiza'); if (el) el.textContent = 'Recarregando a versão mais nova…';
+  const el = dlg.querySelector('.atualiza'); if (el) el.textContent = window.AsxNative ? 'Recarregando…' : 'Recarregando a versão mais nova…';
   try {
     await (await navigator.serviceWorker?.getRegistration())?.update();
     for (const k of await caches.keys()) await caches.delete(k);
@@ -397,7 +408,6 @@ document.addEventListener('submit', (e) => {
     atualizaOdo(d.km, d.data); toast('Abastecimento registrado.');
   } else if (f.dataset.form === 'rota') {
     gm.destino = d.destino;
-    if (navNativo()) { window.AsxNative.navegar(d.destino); toast('Calculando rota…'); return; }
     if (!gm.mapa) { location.href = linksNavegar(d.destino).geo; return; }
     if (!pos) return toast('Toque em "Minha posição" primeiro.');
     gm.mapa.rota(pos, d.destino).then((r) => { gm.resumo = r; rotaAtualizar(); }).catch((e) => toast('Rota: ' + (e.message || e)));
@@ -432,7 +442,10 @@ document.addEventListener('click', (e) => {
   else if (a === 'rota-alt') { gm.resumo = gm.mapa.escolher(+el.dataset.i); rotaAtualizar(); }
   else if (a === 'rota-limpar') { gm.mapa?.limpar(); gm.resumo = null; gm.destino = ''; rotaAtualizar(); }
   else if (a === 'cel-acesso') window.AsxNative.pedirAcesso();
-  else if (a === 'guia-parar') window.AsxNative.pararGuia();
+  else if (a === 'carro') window.AsxNative.modoCarro(!cel.carro?.ativo);
+  else if (a === 'carro-lembrar') { window.AsxNative.lembrarCarro(el.dataset.nome); dlg.close(); toast(`“${el.dataset.nome}” é o carro.`); }
+  else if (a === 'carro-esquecer') { window.AsxNative.lembrarCarro(''); dlg.close(); }
+  else if (a === 'bateria') window.AsxNative.pedirBateria();
   else if (a.startsWith('aviso-')) window.AsxNative.aviso(a.slice(6), el.dataset.chave);
   else if (a === 'obd-ble') obdConectar(new Elm327Ble());
   else if (a === 'obd-hudiy') { conectarCentral(); obdConectar(new HudiyObd(central)); }
@@ -483,23 +496,11 @@ function manobraHtml() {
     ${nav.iconeUrl ? `<img class="${nav.inverter ? 'inv' : ''}" src="${nav.iconeUrl}" alt="">` : ''}
     <div class="stack" style="flex:1;min-width:0">${nav.distancia ? `<div class="num dist">${esc(nav.distancia)}</div>` : ''}<div class="desc">${esc(nav.descricao || 'Navegando')}</div><small class="muted">${esc(nav.fonte || 'Navegação')}</small></div></div>`;
 }
-// Guia do Navigation SDK (APK com chave): estado resumido; o mapa nativo já mostra a manobra.
-function guiaHtml() {
-  const g = cel.guia;
-  if (!g?.ativo) return g?.erro ? `<small class="muted">${esc(g.erro)}</small>` : '';
-  return `<div class="row" style="gap:8px"><small class="muted" style="min-width:0">Para ${esc(g.destino)}${g.segundos ? ' · ' + tempoDistancia(g.segundos, g.metros) : ''}</small><button class="btn-ghost btn-sm" data-action="guia-parar">Parar</button></div>`;
-}
 // No Início: faixa compacta que leva à aba Navegação.
-function faixaHtml() {
-  const g = cel.guia;
-  if (g?.ativo) return `<a class="navlink" href="#/navegacao"><div class="card navcard"><div class="stack" style="flex:1;min-width:0"><div class="desc">Navegando para ${esc(g.destino)}</div><small class="muted">${g.segundos ? tempoDistancia(g.segundos, g.metros) : 'Calculando…'}</small></div></div></a>`;
-  return nav.ativo ? `<a class="navlink" href="#/navegacao">${manobraHtml()}</a>` : '';
-}
+function faixaHtml() { return nav.ativo ? `<a class="navlink" href="#/navegacao">${manobraHtml()}</a>` : ''; }
 function atualizarManobra() {
   const s = main.querySelector('.manobra-slot'); if (s) s.innerHTML = manobraHtml();
   const f = main.querySelector('.faixa-slot'); if (f) f.innerHTML = faixaHtml();
-  const r = main.querySelector('.rota-info'); if (r && navNativo()) r.innerHTML = guiaHtml();
-  sincronizarMapaNativo();
 }
 // O ícone da notificação pode ser claro ou escuro conforme o tema do sistema; no cartão branco, o claro é invertido.
 function iconeClaro(url) {
@@ -566,20 +567,29 @@ function rotaAtualizar() { const el = main.querySelector('.rota-info'); if (el) 
 // Atualiza a posição sem perguntar quando a permissão já foi dada.
 navigator.permissions?.query({ name: 'geolocation' }).then((p) => { if (p.state === 'granted') localizar(false); }).catch(() => {});
 
-// --- Celular (APK): mídia, manobra, avisos e guia pela ponte nativa (window.AsxNative / window.asxNativo) ---
-const cel = { acesso: false, midia: null, guia: null, avisos: [] };
-const navNativo = () => { try { return !!window.AsxNative?.navSdk?.(); } catch { return false; } };
-let erroGuia = '';
+// --- APK: mídia, manobra, avisos e modo carro pela ponte nativa (window.AsxNative / window.asxNativo) ---
+const cel = { acesso: false, midia: null, avisos: [], carro: null };
 function celAplicar(e) {
-  Object.assign(cel, { acesso: !!e.acesso, midia: e.midia || null, guia: e.guia || null, avisos: e.avisos || [] });
+  const carroAntes = !!cel.carro?.ativo;
+  Object.assign(cel, { acesso: !!e.acesso, midia: e.midia || null, avisos: e.avisos || [], carro: e.carro || null });
+  aplicarCarro(carroAntes);
   if (e.nav) {
     const novoIcone = nav.iconeUrl !== e.nav.icone;
     Object.assign(nav, manobraDeNotificacao(e.nav), { ativo: true, central: false, iconeUrl: e.nav.icone });
     if (novoIcone) { nav.inverter = false; if (e.nav.icone) iconeClaro(e.nav.icone).then((c) => { nav.inverter = c; atualizarManobra(); }); }
   } else if (!nav.central) nav.ativo = false;
-  if (cel.guia?.erro && cel.guia.erro !== erroGuia) toast(cel.guia.erro);
-  erroGuia = cel.guia?.erro || '';
   renderPlayer(); renderWidgets(); atualizarManobra();
+}
+// Modo carro (liga pelo áudio Bluetooth do carro ou pelo botão): o nativo cuida de tela cheia, paisagem,
+// tela acesa e do Voltar; aqui só o estado visual e a volta ao Início ao entrar.
+const btnCarro = document.getElementById('btn-carro');
+function aplicarCarro(antes) {
+  const ativo = !!cel.carro?.ativo;
+  document.body.dataset.carro = ativo ? '1' : '';
+  btnCarro.hidden = !window.AsxNative?.modoCarro;
+  btnCarro.setAttribute('aria-pressed', String(ativo));
+  btnCarro.setAttribute('aria-label', ativo ? 'Sair do modo carro' : 'Entrar no modo carro');
+  if (ativo && !antes && location.hash !== '#/') location.hash = '#/';
 }
 window.asxNativo = {
   evento: (json) => { try { celAplicar(typeof json === 'string' ? JSON.parse(json) : json); } catch (err) { console.error(err); } },
@@ -649,18 +659,6 @@ document.addEventListener('click', (e) => {
   const t = e.target.closest('[data-tecla]'); if (t) central.tecla(+t.dataset.tecla);
 });
 
-// --- Mapa nativo (Navigation SDK no APK): a view fica por cima da WebView, no retângulo de #mapa-nativo ---
-let mapaObs;
-function sincronizarMapaNativo() {
-  if (!window.AsxNative?.mapa) return;
-  const el = document.getElementById('mapa-nativo');
-  if (!el || dlg.open) return window.AsxNative.mapa(0, 0, 0, 0);
-  const r = el.getBoundingClientRect();
-  window.AsxNative.mapa(r.left, r.top, r.width, r.height);
-}
-dlg.addEventListener('close', sincronizarMapaNativo);
-window.addEventListener('resize', sincronizarMapaNativo);
-
 // --- Roteamento ---
 const VIEWS = { inicio, navegacao, manutencao, combustivel };
 function render() {
@@ -669,14 +667,8 @@ function render() {
   main.innerHTML = VIEWS[r.view](new URLSearchParams(r.qs), r.sub);
   document.body.dataset.view = r.view;
   document.querySelectorAll('.nav a').forEach((a) => a.toggleAttribute('aria-current', a.dataset.view === r.view));
-  mapaObs?.disconnect();
   if (r.view === 'inicio') montarCarro3d();
-  if (r.view === 'navegacao') {
-    montarMapa(); renderWidgets();
-    const el = document.getElementById('mapa-nativo');
-    if (el) { mapaObs = new ResizeObserver(sincronizarMapaNativo); mapaObs.observe(el); }
-  }
-  sincronizarMapaNativo();
+  if (r.view === 'navegacao') { montarMapa(); renderWidgets(); }
 }
 window.addEventListener('hashchange', () => { render(); main.focus({ preventScroll: true }); window.scrollTo(0, 0); });
 renderPlayer();
@@ -685,4 +677,6 @@ celSincronizar();
 if (window.hudiy) conectarCentral();
 // Dentro da central Hudiy: tecla/gesto de voltar do web view.
 if (window.hudiy) window.hudiy.onGoBack = () => history.back();
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+// No APK a interface vem embutida e não usa service worker; remove o que versões antigas registraram.
+if (window.AsxNative) navigator.serviceWorker?.getRegistrations().then((rs) => rs.forEach((r) => r.unregister())).catch(() => {});
+else if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

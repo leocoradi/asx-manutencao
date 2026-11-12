@@ -5,7 +5,7 @@ Web app (PWA) para acompanhar o Mitsubishi ASX 2017/2018 2.0 16V MIVEC 4x2, câm
 ## O que tem
 
 - **Início**: odômetro, carro 3D com estado por área (motor, câmbio, freios, rodas, elétrica), próximas manutenções, consumo e, com navegação ativa, uma faixa de manobra que leva à aba Navegação.
-- **Navegação**: mapa na área principal, widget de mídia e central de avisos. Em paisagem os widgets empilham à direita do mapa; em retrato, abaixo. O mapa é o **Google Navigation SDK** nativo no APK compilado com chave (guia curva a curva com voz, faixas e trânsito). Sem essa chave, ou no navegador, é o mapa web do Google com trânsito e rota pela Routes API, com o botão **Navegar no Vela**.
+- **Navegação**: mapa web do Google com trânsito ao vivo e rota (chave sua, abaixo), widget de mídia e central de avisos. Em paisagem os widgets empilham à direita do mapa; em retrato, abaixo. Guia curva a curva é com o Vela, Waze ou Google Maps; a manobra deles aparece no card sobre o mapa.
 - **Manutenção**, com três subseções: **Plano** (preventivo em uso severo, km ou meses, com especificações, part numbers e histórico), **Ficha** (motor, fluidos, pneus, lâmpadas, velas, fusíveis) e **OBD** (leitura ao vivo via ELM327 Bluetooth LE, códigos de falha, odômetro e contador de revisão do painel, com simulador).
 - **Combustível**: registro de abastecimentos, km/L por tanque cheio, média e custo por km.
 - **Mídia (no APK)**: rodapé em todas as abas e widget na Navegação com o que o celular está tocando (YouTube Music, Spotify…): capa, faixa, artista, progresso e anterior / play-pause / próxima.
@@ -38,36 +38,32 @@ No Android (Chrome): abrir a URL → menu → *Instalar app*.
 
 ## App Android (APK)
 
-O APK é uma casca fina em Kotlin (`android/`): uma WebView com o app publicado mais o que o navegador não consegue fazer:
+O APK é a central do carro num tablet (pensado para o Galaxy Tab S6 Lite no painel), em Kotlin (`android/`): uma WebView com a interface **embutida no APK** mais o que o navegador não consegue fazer. Fora do carro o tablet continua normal; a central só assume a tela no modo carro.
 
-- **Sessão de mídia**: lê o que está tocando no celular e manda os controles (`MediaSessionManager`).
+- **Interface embutida**: os arquivos do site vão dentro do APK e são servidos no mesmo endereço do GitHub Pages, então a central abre sem internet e os registros já gravados no aparelho continuam valendo.
+- **Modo carro**: liga quando o tablet conecta ao áudio Bluetooth do carro escolhido (ou pelo botão do carro no topo) e desliga quando desconecta. No modo carro: paisagem, tela cheia, tela sempre acesa e Voltar não fecha o app. Fora dele, o ASX é um app comum.
+- **Sessão de mídia**: lê o que está tocando no tablet e manda os controles (`MediaSessionManager`).
 - **Notificações**: manobra do Vela, Google Maps ou Waze e central de avisos (`NotificationListenerService`), só em memória.
-- **Mapa nativo**: `NavigationView` do Google Navigation SDK posicionada sobre a WebView, no retângulo do mapa da aba Navegação.
-- **Intents e sistema**: links externos abrem os apps do Android; barras do sistema viram margem e somem em paisagem; geolocalização pede a permissão do sistema.
+- **Sistema**: links externos abrem os apps do Android; barras do sistema viram margem; se o processo de desenho da WebView morrer, ela é recriada; pedido de isenção de otimização de bateria.
 
 Instalação: baixe `asx-manutencao.apk`, instale (permitir fontes desconhecidas) e, no rodapé, toque em **Permitir** para dar "Acesso a notificações" ao app. Sem isso, mídia, manobras e avisos não aparecem.
 
-Onde baixar: em **Releases**, na versão mais nova ("App 1.N"). Cada build do `main` que mexe em `android/` publica uma.
+Onde baixar: em **Releases**, na versão mais nova ("App 1.N"). Cada build do `main` que mexe em `android/` ou nos arquivos do site publica uma.
+
+### Preparar o tablet para o carro
+
+1. **Escolher o carro**: conecte o tablet ao Bluetooth do rádio do ASX, abra a engrenagem → **Modo carro** → **Usar "<nome>" como o carro**. Daí em diante o modo carro liga sozinho quando esse Bluetooth conecta.
+2. **Bateria**: na mesma seção, **Liberar uso de bateria**. Em *Configurações → Bateria → Limites de uso em segundo plano*, coloque ASX, Waze e YouTube Music em **Apps nunca suspensos**. Ligue **Proteger bateria** (carga até 85%) por causa do calor no painel.
+3. **Abrir sozinho** (opcional): em *Configurações → Modos e rotinas → Rotinas → +*, condição **Dispositivo Bluetooth conectado** (o rádio do carro), ações **Abrir app** (ASX), **Não perturbar** e **Tempo limite da tela** no máximo. Ao desconectar, a rotina desfaz os ajustes. Há relatos de ajustes que não voltam; confira no tablet e, se preciso, adicione ações de término.
+4. **Sem bloqueio no carro** (opcional): *Configurações → Tela de bloqueio → Smart Lock → Dispositivos confiáveis*, adicione o Bluetooth do rádio. Em casa o bloqueio continua.
 
 ### Atualizar
 
-- **Página** (telas, estilos, lógica): atualiza sozinha. O app sempre confere os arquivos com o servidor ao abrir.
-- **APK** (parte nativa): engrenagem → **Procurar atualização**. O app consulta a release mais nova; se houver, mostra **Baixar e instalar**, baixa o APK e o Android pede confirmação. Na primeira vez o Android pede para permitir "Instalar apps desconhecidos" para o ASX. Sem APK novo, o botão recarrega a página na versão mais nova.
+- **Interface e APK** vêm juntos: a interface está embutida, então qualquer mudança chega pela versão nova do APK.
+- Engrenagem → **Procurar atualização**. O app consulta a release mais nova; se houver, mostra **Baixar e instalar**, baixa o APK e o Android pede confirmação. Na primeira vez o Android pede para permitir "Instalar apps desconhecidos" para o ASX.
 - Todos os APKs são assinados pela mesma chave, guardada pelo CI num **rascunho de release "assinatura"**. Não apague nem publique esse rascunho: sem ele, o app instalado deixa de aceitar atualizações.
 - APKs instalados antes da versão com o botão foram assinados com chaves descartáveis. Para a primeira instalação com a chave fixa: exporte o backup, desinstale o app antigo, instale o novo e importe o backup. Daí em diante, o botão resolve.
-- Com o secret `MAPS_API_KEY` configurado, o APK vai para o rascunho "APK com mapa nativo (privado)" e não é publicado, então o botão não o encontra.
-
-### Mapa nativo (Navigation SDK)
-
-1. No [Google Cloud](https://console.cloud.google.com), no mesmo projeto, ative a API **Navigation SDK**.
-2. Crie uma **segunda chave de API** só para o app Android, com restrição de API apenas ao Navigation SDK. A chave do mapa web é restrita por site e não serve aqui.
-3. Em *APIs e serviços → Navigation SDK → Cotas*, limite os pedidos por dia (30 por dia mantém o mês abaixo dos 1.000 destinos gratuitos). Crie também um alerta de orçamento.
-4. No GitHub: *Settings → Secrets and variables → Actions → New repository secret*, nome `MAPS_API_KEY`, valor a chave.
-5. Rode o workflow **Android**. O APK sai no rascunho de release.
-
-Uso: na aba Navegação, digite o destino e toque em **Ir**. Na primeira vez o Google mostra os termos de uso. O endereço vira coordenada pelo Geocoder do Android, sem custo; cada destino pedido conta 1 na cota do Navigation SDK.
-
-Numa central multimídia Android, instale o APK e defina como tela inicial.
+- No navegador (GitHub Pages), a página se atualiza sozinha.
 
 ## Chave do Google Maps para o mapa web
 

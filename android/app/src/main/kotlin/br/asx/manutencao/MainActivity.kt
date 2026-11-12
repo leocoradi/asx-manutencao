@@ -4,42 +4,54 @@ import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.media.AudioDeviceCallback
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.webkit.GeolocationPermissions
+import android.webkit.RenderProcessGoneDetail
+import android.webkit.ServiceWorkerClient
+import android.webkit.ServiceWorkerController
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import android.widget.Toast
 import java.util.Locale
 
-// Casca fina: WebView com o web app publicado + ponte nativa (mídia, manobras, avisos e mapa de navegação).
+// Casca da central: WebView com a interface embutida no APK + ponte nativa (mídia, manobras, avisos,
+// modo carro e atualização). Fora do modo carro é um app comum.
 class MainActivity : Activity() {
     private lateinit var raiz: FrameLayout
     private lateinit var web: WebView
-    private var mapa: MapaNativo? = null
+    private lateinit var base: Uri
     private var geoOrigem: String? = null
     private var geoCallback: GeolocationPermissions.Callback? = null
-    private var destinoPendente: Triple<Double, Double, String>? = null
     private var tts: TextToSpeech? = null
     private var ttsPronto = false
+    private val audioCb = object : AudioDeviceCallback() {
+        override fun onAudioDevicesAdded(d: Array<out AudioDeviceInfo>) = atualizarAudio()
+        override fun onAudioDevicesRemoved(d: Array<out AudioDeviceInfo>) = atualizarAudio()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        base = Uri.parse(getString(R.string.app_url))
         raiz = FrameLayout(this)
         raiz.setBackgroundColor(0xFF0A0A0A.toInt())
-        web = WebView(this)
-        web.setBackgroundColor(0xFF0A0A0A.toInt())
-        raiz.addView(web, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         setContentView(raiz)
 
         // Android 15+ desenha o app atrás das barras do sistema: as margens (barras, recorte da tela e
@@ -55,25 +67,58 @@ class MainActivity : Activity() {
             }
             if (Build.VERSION.SDK_INT >= 30) WindowInsets.CONSUMED else consumir(i)
         }
-        aplicarBarras()
 
+        // Pedidos do service worker de versões antigas também são servidos pelos arquivos embutidos.
+        ServiceWorkerController.getInstance().setServiceWorkerClient(object : ServiceWorkerClient() {
+            override fun shouldInterceptRequest(request: WebResourceRequest) = local(request.url)
+        })
+
+        criarWebView()
+        tts = TextToSpeech(this) { st -> if (st == TextToSpeech.SUCCESS) { tts?.language = Locale("pt", "BR"); ttsPronto = true } }
+
+        Estado.ouvinte = { json -> runOnUiThread { web.evaluateJavascript("window.asxNativo && window.asxNativo.evento($json)", null) } }
+        Atualizador.ouvinte = { json -> runOnUiThread { web.evaluateJavascript("window.asxNativo && window.asxNativo.atualizacao && window.asxNativo.atualizacao($json)", null) } }
+        ModoCarro.iniciar(this)
+        ModoCarro.aoMudar = { aplicarModo(it) }
+        // O Android chama o callback na hora com os dispositivos já conectados.
+        getSystemService(AudioManager::class.java).registerAudioDeviceCallback(audioCb, Handler(Looper.getMainLooper()))
+        aplicarModo(ModoCarro.ativo)
+
+        if (savedInstanceState == null) web.loadUrl(base.toString()) else web.restoreState(savedInstanceState)
+    }
+
+    private fun criarWebView() {
+        web = WebView(this)
+        web.setBackgroundColor(0xFF0A0A0A.toInt())
+        raiz.addView(web, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         web.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
             databaseEnabled = true
             mediaPlaybackRequiresUserGesture = false
             setGeolocationEnabled(true)
-            userAgentString = "$userAgentString AsxApp/2"
+            userAgentString = "$userAgentString AsxApp/3"
         }
         web.addJavascriptInterface(Ponte(this), "AsxNative")
-
-        val base = Uri.parse(getString(R.string.app_url))
         web.webViewClient = object : WebViewClient() {
+            // Interface embutida: os arquivos do app saem do APK, no mesmo endereço do site, então os
+            // registros já gravados no aparelho continuam valendo e a central abre sem internet.
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest) = local(request.url)
+
             // Links do próprio app ficam na WebView; geo:, intents e sites externos vão para o Android.
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val u = request.url
                 if (u.scheme in setOf("http", "https") && u.host == base.host) return false
                 return try { startActivity(Intent(Intent.ACTION_VIEW, u)); true } catch (e: ActivityNotFoundException) { false }
+            }
+
+            // Se o processo de desenho da WebView morrer (memória), recria em vez de deixar a tela em branco.
+            override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+                raiz.removeView(web)
+                web.destroy()
+                criarWebView()
+                web.loadUrl(base.toString())
+                return true
             }
         }
         web.webChromeClient = object : WebChromeClient() {
@@ -82,23 +127,44 @@ class MainActivity : Activity() {
                 else { geoOrigem = origin; geoCallback = callback; pedirLocalizacao() }
             }
         }
+    }
 
-        if (BuildConfig.TEM_NAV) mapa = try { MapaNativo(this, raiz, savedInstanceState) } catch (e: Exception) { null }
-        tts = TextToSpeech(this) { st -> if (st == TextToSpeech.SUCCESS) { tts?.language = Locale("pt", "BR"); ttsPronto = true } }
-
-        Estado.ouvinte = { json -> runOnUiThread { web.evaluateJavascript("window.asxNativo && window.asxNativo.evento($json)", null) } }
-        Atualizador.ouvinte = { json -> runOnUiThread { web.evaluateJavascript("window.asxNativo && window.asxNativo.atualizacao && window.asxNativo.atualizacao($json)", null) } }
-        if (savedInstanceState == null) web.loadUrl(base.toString()) else web.restoreState(savedInstanceState)
+    // Arquivo embutido (assets/www) para um endereço do app; null deixa ir para a rede.
+    private fun local(url: Uri): WebResourceResponse? {
+        if (url.host != base.host) return null
+        val prefixo = base.path ?: "/"
+        val caminho = url.path ?: return null
+        if (!caminho.startsWith(prefixo)) return null
+        val arquivo = caminho.removePrefix(prefixo).let { if (it.isEmpty() || it.endsWith("/")) it + "index.html" else it }
+        if (arquivo.contains("..")) return null
+        val tipo = TIPOS[arquivo.substringAfterLast('.', "").lowercase()] ?: "application/octet-stream"
+        val texto = tipo.startsWith("text/") || tipo.endsWith("json") || tipo.endsWith("javascript")
+        return try { WebResourceResponse(tipo, if (texto) "utf-8" else null, assets.open("www/$arquivo")) } catch (e: Exception) { null }
     }
 
     @Suppress("DEPRECATION")
     private fun consumir(i: WindowInsets): WindowInsets = i.consumeSystemWindowInsets()
 
-    // Em paisagem (uso no carro) as barras do sistema ficam escondidas e voltam com um gesto.
+    // Áudio Bluetooth conectado agora; o modo carro compara com o carro escolhido.
+    private fun atualizarAudio() {
+        val bt = getSystemService(AudioManager::class.java).getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+            .firstOrNull { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP }
+        ModoCarro.audioMudou(bt?.productName?.toString()?.takeIf { it.isNotBlank() })
+    }
+
+    // Modo carro: paisagem, tela sempre acesa e barras escondidas. Fora dele, o app segue o tablet.
+    private fun aplicarModo(carro: Boolean) {
+        if (carro) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        requestedOrientation = if (carro) ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        aplicarBarras()
+    }
+
+    // Barras do sistema escondidas no modo carro e em paisagem; voltam com um gesto da borda.
     private fun aplicarBarras() {
         if (Build.VERSION.SDK_INT < 30) return
         val c = window.insetsController ?: return
-        if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+        if (ModoCarro.ativo || resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
             c.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             c.hide(WindowInsets.Type.systemBars())
         } else c.show(WindowInsets.Type.systemBars())
@@ -111,56 +177,48 @@ class MainActivity : Activity() {
         val ok = grantResults.any { it == PackageManager.PERMISSION_GRANTED }
         geoCallback?.invoke(geoOrigem, ok, ok)
         geoCallback = null; geoOrigem = null
-        val d = destinoPendente; destinoPendente = null
-        if (d != null) {
-            if (ok) navegar(d.first, d.second, d.third)
-            else { Estado.guia = Estado.Guia(false, d.third, 0, 0, "Sem permissão de localização."); Estado.emitir() }
-        }
     }
 
-    // --- Chamados pela Ponte ---
-    fun temMapaNativo() = mapa != null
-    fun posicionarMapa(x: Float, y: Float, w: Float, h: Float) { mapa?.posicionar(x, y, w, h) }
-    fun navegar(lat: Double, lng: Double, titulo: String) {
-        if (!temLocalizacao()) { destinoPendente = Triple(lat, lng, titulo); pedirLocalizacao(); return }
-        mapa?.navegar(lat, lng, titulo)
-    }
-    fun pararGuia() { mapa?.parar() }
     fun falar(texto: String) { if (ttsPronto) tts?.speak(texto, TextToSpeech.QUEUE_FLUSH, null, "aviso") }
 
-    // --- Ciclo de vida (repassado ao mapa nativo) ---
-    override fun onStart() { super.onStart(); mapa?.view?.onStart() }
     override fun onResume() {
         super.onResume()
-        mapa?.view?.onResume()
         Midia.conectar(this) // depois de o usuário dar o acesso a notificações, a sessão passa a ser lida
         Estado.emitir()
     }
-    override fun onPause() { mapa?.view?.onPause(); super.onPause() }
-    override fun onStop() { mapa?.view?.onStop(); super.onStop() }
     override fun onDestroy() {
         Estado.ouvinte = null
         Atualizador.ouvinte = null
+        ModoCarro.aoMudar = null
+        getSystemService(AudioManager::class.java).unregisterAudioDeviceCallback(audioCb)
         tts?.shutdown()
-        mapa?.destruir()
+        web.destroy()
         super.onDestroy()
     }
     override fun onWindowFocusChanged(hasFocus: Boolean) { super.onWindowFocusChanged(hasFocus); if (hasFocus) aplicarBarras() }
-    override fun onConfigurationChanged(newConfig: Configuration) {
-        super.onConfigurationChanged(newConfig)
-        mapa?.view?.onConfigurationChanged(newConfig)
-        aplicarBarras()
-    }
-    override fun onTrimMemory(level: Int) { super.onTrimMemory(level); mapa?.view?.onTrimMemory(level) }
+    override fun onConfigurationChanged(newConfig: Configuration) { super.onConfigurationChanged(newConfig); aplicarBarras() }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         web.saveState(outState)
-        mapa?.view?.onSaveInstanceState(outState)
     }
 
+    // No modo carro, Voltar navega dentro do app mas não fecha a central.
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (web.canGoBack()) web.goBack() else super.onBackPressed()
+        when {
+            web.canGoBack() -> web.goBack()
+            ModoCarro.ativo -> Toast.makeText(this, "Modo carro: para sair, toque no botão do carro no topo.", Toast.LENGTH_SHORT).show()
+            else -> super.onBackPressed()
+        }
+    }
+
+    companion object {
+        private val TIPOS = mapOf(
+            "html" to "text/html", "css" to "text/css", "js" to "text/javascript", "mjs" to "text/javascript",
+            "json" to "application/json", "webmanifest" to "application/manifest+json", "svg" to "image/svg+xml",
+            "png" to "image/png", "jpg" to "image/jpeg", "glb" to "model/gltf-binary", "wasm" to "application/wasm",
+            "txt" to "text/plain", "woff2" to "font/woff2",
+        )
     }
 }

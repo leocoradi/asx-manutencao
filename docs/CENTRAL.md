@@ -92,7 +92,7 @@ Mudança central da arquitetura: **a interface web passa a ser embutida no APK**
 
 ## Ordem de execução proposta
 
-1. **Base de central:** interface embutida no APK; modo carro (detecção, liga e desliga, layout em paisagem com tela cheia, Voltar sem sair); reabrir a WebView se o processo de desenho morrer; pedido de isenção de otimização de bateria; remover Navigation SDK e mapa web do Google. Guia da rotina da Samsung no README.
+1. **Base de central** (feito, falta testar no tablet; o mapa web do Google foi mantido porque funciona com a chave gratuita já configurada): interface embutida no APK; modo carro (detecção, liga e desliga, layout em paisagem com tela cheia, Voltar sem sair); reabrir a WebView se o processo de desenho morrer; pedido de isenção de otimização de bateria; remover Navigation SDK e mapa web do Google. Guia da rotina da Samsung no README.
 2. **OBD nativo:** `ObdService` com SPP e BLE, associação pelo `CompanionDeviceManager`, reconexão automática, ponte para o decodificador em JS; adaptador presente também liga o modo carro.
 3. **UX automotiva:** novos tamanhos (76 dp, 32/24 dp), contraste, Início como painel de direção, bloqueio de formulários em movimento.
 4. **Multitarefa:** botão "Navegar" abrindo Waze ou Google Maps ao lado; indicadores de rede, áudio e OBD; avisos resumidos em movimento; botão flutuante "Voltar à central".

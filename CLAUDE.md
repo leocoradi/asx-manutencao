@@ -31,7 +31,7 @@ sw.js               cache offline (bump de CACHE a cada mudança no shell)
 tests/              node --test
 tools/              servidor Hudiy falso, ponte nativa falsa, capturas de tela, mapa falso
 hudiy/              configs de exemplo para registrar o app na central
-android/            APK em Kotlin (WebView + ponte nativa + Navigation SDK); compila só no CI
+android/            APK em Kotlin (interface embutida + modo carro + ponte nativa); compila só no CI; o workflow copia o site para assets/www
 .github/workflows   Pages (testa e publica) e Android (gera o APK)
 ```
 

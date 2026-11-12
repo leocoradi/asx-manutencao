@@ -40,6 +40,8 @@ small { font-size: 12px; }
 .brand { display: flex; flex-direction: column; }
 .brand .dot-title { font-size: 22px; }
 .brand .sub { font-size: 12px; color: var(--fg-dim); }
+.top-acoes { display: flex; gap: 6px; align-items: center; }
+#btn-carro[aria-pressed=true] { background: var(--fg); color: var(--bg); border-radius: 999px; }
 
 .nav { grid-area: nav; display: flex; justify-content: space-around; align-items: center; background: var(--bg); border-top: 1px dashed var(--line); padding: 0 4px env(safe-area-inset-bottom); height: calc(var(--nav-h) + env(safe-area-inset-bottom)); position: sticky; bottom: 0; z-index: 5; }
 .nav a { display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--fg-dim); text-decoration: none; font-size: 11px; padding: 6px 10px; border-radius: 14px; min-width: 56px; }
@@ -160,11 +162,10 @@ body[data-view=navegacao] .player { display: none; }
 .nav-view { flex: 1; min-width: 0; min-height: 0; display: grid; gap: 10px; grid-template: "mapa" minmax(0, 1fr) "midia" auto "avisos" minmax(84px, 22dvh) / minmax(0, 1fr); }
 .mapa-area { grid-area: mapa; display: flex; flex-direction: column; gap: 8px; min-height: 0; min-width: 0; position: relative; }
 .mapa-area .rota-info:not(:empty) { display: grid; gap: 6px; }
-/* Mapa web: manobra no canto de cima e resumo da rota no canto de baixo, sobre o mapa (como no Android Auto).
-   Com a view nativa por cima, nada em HTML aparece sobre o mapa, então lá os dois ficam empilhados. */
-.mapa-area:not(.nativo) .manobra-slot { position: absolute; top: 8px; left: 8px; right: 8px; z-index: 2; pointer-events: none; }
-.mapa-area:not(.nativo) .manobra-slot .navcard { pointer-events: auto; width: max-content; max-width: min(560px, 100%); box-shadow: 0 4px 16px rgba(0,0,0,.45); }
-.mapa-area:not(.nativo) .rota-info:not(:empty) { position: absolute; left: 8px; right: 8px; bottom: 60px; z-index: 2; max-width: 560px; max-height: 50%; overflow: auto;
+/* Manobra no canto de cima e resumo da rota no canto de baixo, sobre o mapa (como no Android Auto). */
+.mapa-area .manobra-slot { position: absolute; top: 8px; left: 8px; right: 8px; z-index: 2; pointer-events: none; }
+.mapa-area .manobra-slot .navcard { pointer-events: auto; width: max-content; max-width: min(560px, 100%); box-shadow: 0 4px 16px rgba(0,0,0,.45); }
+.mapa-area .rota-info:not(:empty) { position: absolute; left: 8px; right: 8px; bottom: 60px; z-index: 2; max-width: 560px; max-height: 50%; overflow: auto;
   background: var(--bg); border: 1px dashed var(--line); border-radius: var(--r); padding: 10px 12px; box-shadow: 0 4px 16px rgba(0,0,0,.45); }
 .mapa-box { flex: 1; min-height: 100px; border-radius: var(--r); overflow: hidden; background: var(--bg-2); border: 1px dashed var(--line); }
 .mapa-box.gmapa { aspect-ratio: auto; max-height: none; }
@@ -172,7 +173,7 @@ body[data-view=navegacao] .player { display: none; }
 .destino { gap: 8px; }
 .destino input { min-width: 0; }
 .rota-info { max-height: 34%; overflow: auto; }
-.mapa-area:not(.nativo) .destino { flex: none; }
+.mapa-area .destino { flex: none; }
 .w-midia { grid-area: midia; min-width: 0; min-height: 0; display: grid; gap: 8px 12px; align-items: center; grid-template: "topo ctl" auto "prog prog" auto / minmax(0, 1fr) auto; padding: 12px 14px; }
 .wm-topo { grid-area: topo; display: flex; align-items: center; gap: 12px; min-width: 0; }
 .wm-prog { grid-area: prog; display: flex; align-items: center; gap: 10px; }

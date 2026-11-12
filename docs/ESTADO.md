@@ -21,7 +21,8 @@ Web app (PWA) para acompanhar um Mitsubishi ASX 2017/2018 2.0 16V MIVEC 4x2 manu
 | APK Android (`android/`) | rodou em aparelho real na versão 1.0; a 1.1 (margens do sistema, avisos, mapa nativo) **compila no CI e ainda não foi testada em aparelho** | WebView + sessão de mídia + notificações (manobra e avisos) + `NavigationView`. Ponte `window.AsxNative` / `window.asxNativo`. |
 | Atualização | código pronto; **instalar por cima só foi verificado no CI** (assinatura reaproveitada), não no aparelho | Página: service worker revalida os arquivos a cada carga. APK: `Atualizador.kt` consulta `releases/latest` (tag `apk-<build>`, igual ao versionCode) e instala por `PackageInstaller`. Chave fixa em rascunho de release "assinatura". |
 | Abas e tela de Navegação | pronto | Início, Navegação, Manutenção (Plano/Ficha/OBD), Combustível. Navegação em grid: mapa, mídia, avisos. Verificado em 390×844, 844×390, 1024×600 com a ponte simulada (`tools/celular-falso.cjs`). |
-| Mapa nativo (Google Navigation SDK 8) | código pronto, **depende do secret `MAPS_API_KEY` e de teste em aparelho** | `MapaNativo.kt`. Sem a chave o app usa o mapa web. |
+| Mapa nativo (Google Navigation SDK) | **removido** | Exigia depósito de R$ 170 no Google Cloud; o dono quer custo zero. Navegação guiada fica com Waze, Google Maps ou Vela. |
+| Interface embutida e modo carro | código pronto, **compilado no CI, não testado no tablet** | `MainActivity.local()` serve `assets/www` no endereço do Pages; `ModoCarro.kt` liga pelo áudio Bluetooth do carro escolhido ou pelo botão. |
 | Trânsito ao vivo do Google | pronto, **não testado com chave real** | Mapa JS com TrafficLayer; rota pela **Routes API** (TRAFFIC_AWARE, alternativas). Chave do usuário em `localStorage` (`asx.gmaps`). |
 | Navegação | entregue ao **Vela** pelo intent `geo:` | Botão "Navegar no Vela" com coordenadas do destino. |
 | Layouts | pronto | 390 retrato, 844×390 paisagem, 820 tablet, 1366 desktop, 1024×600 central. |

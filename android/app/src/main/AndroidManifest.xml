@@ -6,6 +6,8 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Botão "Procurar atualização": instala a versão nova do APK (o Android pede confirmação). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Pedido de isenção de otimização de bateria (a One UI suspende apps em segundo plano). -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!-- Para abrir o app de navegação e o YouTube Music a partir do web app. -->
     <queries>
@@ -19,9 +21,6 @@
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
         android:usesCleartextTraffic="false"
         android:allowBackup="false">
-
-        <!-- Chave do Google (Navigation SDK). Preenchida no build a partir do secret MAPS_API_KEY. -->
-        <meta-data android:name="com.google.android.geo.API_KEY" android:value="${MAPS_API_KEY}" />
 
         <activity
             android:name=".MainActivity"

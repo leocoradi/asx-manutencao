@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { analisarHash, manobraDeNotificacao, mmss, tempoDistancia } from '../src/painel.js';
+import { analisarHash, manobraDeNotificacao, mmss } from '../src/painel.js';
 
 test('rotas das abas e redirecionamento das antigas', () => {
   assert.deepEqual(analisarHash(''), { view: 'inicio', sub: '', qs: '', redirecionar: null });
@@ -30,6 +30,4 @@ test('manobra: distância no título, rua no texto', () => {
 
 test('formatação de tempo', () => {
   assert.equal(mmss(83000), '1:23');
-  assert.equal(tempoDistancia(754, 5230), '13 min · 5,2 km');
-  assert.equal(tempoDistancia(4000, 420), '1 h 7 min · 420 m');
 });
