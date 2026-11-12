@@ -46,14 +46,15 @@ Android Auto só executa apps nativos de categorias aprovadas pelo Google; um we
 
 ## Visualizador 3D do ASX
 
-O app usa uma silhueta vetorial preta (`src/car.js`) por ser leve e não depender de licença. Modelos 3D gratuitos encontrados para evoluir no futuro (verificar licença na página antes de usar):
+O card do carro na tela Início mostra um modelo 3D preto (`assets/asx.glb`, 2,5 MB) com os pontos de atenção por área posicionados sobre a carroceria. Dá para girar com o dedo; o zoom fica travado. Enquanto carrega, e se o WebGL ou o arquivo falharem, aparece a silhueta vetorial de `src/car.js`.
 
-- Sketchfab, "Mitsubishi ASX 2024" por teenlin3, CC Attribution, download livre, mas gerado por IA e da 2ª geração: https://sketchfab.com/3d-models/mitsubishi-asx-2024-d750320c556e4ec0b95a0628efbd24b9
-- SketchUp 3D Warehouse, "2011 Mitsubishi Outlander Sport/RVR/ASX (Low Poly)", 1ª geração (mesma carroceria do 2017/2018), gratuito: https://embed-3dwarehouse-classic.sketchup.com/model/318cd080dba5dc4a94db926ad0cd7381/2011-Mitsubishi-Outlander-SportRVRASX-Low-Poly
-- 3DModels.org, "Mitsubishi Outlander Sport (RVR / ASX) 2014" em glTF/GLB com materiais editáveis (dá para pintar de preto), licença royalty free, pago: https://3dmodels.org/3d-models/mitsubishi-outlander-sport-rvr-asx-2012/
-- Blueprint 2D CC do ASX 2010 (base para redesenhar a silhueta): https://getoutlines.com/blueprints/16296/2010-mitsubishi-asx-suv-blueprints
+Modelo: "Mitsubishi ASX" por mamont nikita (Sketchfab), CC-BY-4.0. Crédito completo em `assets/asx-LICENSE.txt`. Modificações feitas aqui: carroceria e maçanetas pintadas de preto (materiais 9 e 4), pinças de freio mantidas vermelhas, malha simplificada de 712 mil para 291 mil triângulos e compactada com meshopt via glTF Transform:
 
-Para usar um GLB: converter com Blender, pintar o material da carroceria de preto e exibir com `<model-viewer>` no card do carro.
+```bash
+npx @gltf-transform/cli optimize scene.gltf asx.glb --compress meshopt --simplify-ratio 0.2 --simplify-error 0.001 --palette false --texture-compress false
+```
+
+Visualizador: `<model-viewer>` 4.7 (Google, Apache-2.0) e o decodificador meshopt (MIT), vendorados em `vendor/` para funcionar offline.
 
 ## Estrutura
 
@@ -63,11 +64,13 @@ style.css           tema inspirado no Nothing UI (preto, cartões brancos, fonte
 src/app.js          estado, rotas, telas, formulários, backup
 src/data.js         base técnica do veículo e plano de manutenção
 src/plan.js         vencimentos e consumo
-src/car.js          silhueta do carro com pontos de atenção
+src/car.js          modelo 3D e silhueta SVG com pontos de atenção
+vendor/             model-viewer e decodificador meshopt
+assets/asx.glb      modelo 3D preto (CC-BY-4.0, ver asx-LICENSE.txt)
 src/obd.js          decodificador OBDb, ISO-TP, DTCs, ELM327 BLE, simulador
 src/signalset.js    sinais no formato OBDb v3
 sw.js               cache offline
 tests/              node --test
 ```
 
-Créditos: tipografia Doto (Google Fonts), inspiração visual Nothing UI (Community, Zognest), dados OBD de OBDb.
+Créditos: tipografia Doto (Google Fonts), inspiração visual Nothing UI (Community, Zognest), dados OBD de OBDb, modelo 3D de mamont nikita (CC-BY-4.0).

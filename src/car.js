@@ -20,3 +20,19 @@ export function carro(statusPorArea, nomes) {
     ${hot}
   </svg>`;
 }
+
+// Posições dos pontos no modelo 3D (espaço do GLB: x = comprimento, frente em -x; y = altura; z = largura).
+const PONTOS_3D = { motor: [-44, 38, -52], eletrica: [-64, 30, -4], cambio: [-4, -6, 11], freios: [-49, 0, 13], rodas: [47, 0, 13] };
+// Extensão projetada do carro na órbita padrão (-32°), em unidades do modelo, para enquadrar a câmera.
+export const CARRO_3D = { largura: 175, altura: 90 };
+
+// <model-viewer> com os mesmos pontos; a silhueta SVG é o poster (carregando) e o fallback (erro).
+export function carro3d(statusPorArea, nomes) {
+  const hot = Object.entries(PONTOS_3D).map(([area, p]) => `
+    <button class="hot3d ${statusPorArea[area] ?? 'sem'}" slot="hotspot-${area}" data-position="${p.join(' ')}" data-normal="0 0 1" data-area="${area}" aria-label="${nomes[area]}: ${statusPorArea[area] ?? 'sem registro'}"><i></i><span>${nomes[area]}</span></button>`).join('');
+  return `<model-viewer class="car3d" src="assets/asx.glb" alt="Mitsubishi ASX preto" camera-controls disable-zoom disable-pan touch-action="pan-y"
+    camera-orbit="-32deg 78deg auto" exposure="1.1" shadow-intensity="1" environment-image="neutral" interaction-prompt="none">
+    <div slot="poster" class="poster">${carro(statusPorArea, nomes)}</div>
+    ${hot}
+  </model-viewer>`;
+}

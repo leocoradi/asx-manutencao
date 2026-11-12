@@ -1,6 +1,6 @@
 import { VEICULO, AREAS, PLANO, FLUIDOS, FICHA, PNEUS, LAMPADAS, FUSIVEIS } from './data.js';
 import { situacao, ordenar, consumo } from './plan.js';
-import { carro } from './car.js';
+import { carro, carro3d, CARRO_3D } from './car.js';
 import { Elm327Ble, Simulador, COMANDOS } from './obd.js';
 
 // --- Estado e persistência (localStorage + backup JSON) ---
@@ -71,7 +71,7 @@ function inicio() {
     </section>
     <section class="card dark span-2">
       <h2>${esc(VEICULO.nome)}</h2>
-      ${carro(porArea, AREAS)}
+      ${carro3d(porArea, AREAS)}
       <div class="legend"><span><i></i>Em dia</span><span><i class="breve"></i>Em breve</span><span><i class="vencido"></i>Vencido</span><span><i class="sem"></i>Sem registro</span></div>
     </section>
     <section class="card ${vencidos ? 'alert' : ''} span-2">
@@ -354,7 +354,25 @@ document.addEventListener('click', (e) => {
   else if (a === 'obd-odo') { S.odo = { km: Math.round(obd.valores.ASX_ODO), data: hojeIso() }; salvar(); toast('Odômetro sincronizado.'); }
 });
 document.getElementById('btn-config').addEventListener('click', dlgConfig);
-main.addEventListener('click', (e) => { const h = e.target.closest('.hot'); if (h) location.hash = `#/manutencao?area=${h.dataset.area}`; });
+main.addEventListener('click', (e) => { const h = e.target.closest('.hot, .hot3d'); if (h) location.hash = `#/manutencao?area=${h.dataset.area}`; });
+// Modelo 3D: carrega o visualizador só quando a tela Início está aberta; em erro (sem WebGL, sem rede) fica a silhueta SVG.
+let mvPronto;
+function montarCarro3d() {
+  const mv = main.querySelector('model-viewer'); if (!mv) return;
+  const fallback = () => mv.replaceWith(Object.assign(document.createElement('div'), { innerHTML: mv.querySelector('.poster').innerHTML }));
+  // Raio da câmera pelo aspecto do elemento: o enquadramento automático usa a esfera envolvente e deixa o carro pequeno.
+  const enquadrar = () => {
+    const vis = 2 * Math.tan((30 / 2) * Math.PI / 180); // altura visível por metro de distância (fov 30°)
+    const d = Math.max((CARRO_3D.largura * 1.1) / (vis * (mv.clientWidth / Math.max(mv.clientHeight, 1))), (CARRO_3D.altura * 1.1) / vis);
+    mv.cameraOrbit = `-32deg 78deg ${d}m`; mv.minCameraOrbit = `auto 60deg ${d}m`; mv.maxCameraOrbit = `auto 92deg ${d}m`;
+  };
+  mvPronto ??= import('../vendor/model-viewer.min.js').then((m) => { m.ModelViewerElement.meshoptDecoderLocation = 'vendor/meshopt_decoder.js'; }).catch(() => null);
+  mvPronto.then((ok) => {
+    if (ok === null) return fallback();
+    mv.addEventListener('error', fallback, { once: true });
+    enquadrar(); new ResizeObserver(enquadrar).observe(mv);
+  });
+}
 main.addEventListener('keydown', (e) => { const h = e.target.closest('.hot'); if (h && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); h.click(); } });
 
 // --- Roteamento ---
@@ -364,6 +382,7 @@ function render() {
   const view = VIEWS[path] ? path : 'inicio';
   main.innerHTML = VIEWS[view](new URLSearchParams(qs));
   document.querySelectorAll('.nav a').forEach((a) => a.toggleAttribute('aria-current', a.dataset.view === view));
+  if (view === 'inicio') montarCarro3d();
 }
 window.addEventListener('hashchange', () => { render(); main.focus({ preventScroll: true }); window.scrollTo(0, 0); });
 render();

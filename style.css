@@ -108,6 +108,17 @@ dialog { border: 0; border-radius: var(--r); padding: 20px; width: min(520px, ca
 dialog::backdrop { background: rgba(0,0,0,.7); }
 dialog h2 { margin-top: 0; }
 
+/* Modelo 3D */
+.car3d { width: 100%; height: auto; aspect-ratio: 3 / 2; max-height: 420px; background: transparent; --poster-color: transparent; display: block; }
+.poster { width: 100%; height: 100%; display: flex; align-items: center; }
+.hot3d { background: none; border: 0; padding: 0; min-height: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--fg); transform: translate(-50%, -50%); }
+.hot3d i { width: 14px; height: 14px; border-radius: 50%; background: var(--fg); border: 1px dashed var(--fg); box-shadow: 0 0 0 4px rgba(10,10,10,.7), 0 0 0 5px var(--fg); display: block; }
+.hot3d.vencido i { background: var(--red); box-shadow: 0 0 0 4px rgba(10,10,10,.7), 0 0 0 5px var(--red); }
+.hot3d.breve i { background: var(--warn); }
+.hot3d.sem i { background: var(--fg-dim); }
+.hot3d span { font-family: var(--dot); font-weight: 700; font-size: 11px; letter-spacing: .05em; text-transform: uppercase; background: rgba(10,10,10,.75); padding: 1px 5px; border-radius: 6px; white-space: nowrap; }
+.hot3d[data-visibility-hidden] { opacity: .25; }
+
 /* Silhueta do carro */
 .car { width: 100%; height: auto; display: block; }
 .hot { cursor: pointer; }
@@ -143,6 +154,7 @@ dialog h2 { margin-top: 0; }
   .top { padding: 20px 32px 8px; }
   .grid { grid-template-columns: 1fr 1fr; }
   .tiles { grid-template-columns: repeat(3, 1fr); }
+  .car3d { aspect-ratio: 16 / 8; }
   .toast { bottom: 24px; }
 }
 /* Desktop */
