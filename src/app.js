@@ -312,7 +312,7 @@ function dlgConfig() {
     <label>Chave da API (fica só neste aparelho)<input name="chave" autocomplete="off" spellcheck="false" placeholder="AIza…" value="${esc(gm.chave)}"></label>
     <div class="actions"><button type="submit" class="btn-sm">Salvar chave</button></div>
   </form>
-  <p class="muted"><small>Crie no console do Google Cloud com as APIs "Maps JavaScript" e "Directions" ativas e restrinja a chave ao domínio deste app. Uso pessoal cabe na cota gratuita.</small></p>
+  <p class="muted"><small>Crie no console do Google Cloud com as APIs "Maps JavaScript API" e "Routes API" ativas e restrinja a chave ao domínio deste app. Uso pessoal cabe na cota gratuita.</small></p>
   <h2 style="margin-top:20px">Apagar tudo</h2>
   <div class="actions"><button class="btn-red" data-action="zerar">Apagar todos os registros</button><button class="btn-ghost" data-action="fechar">Fechar</button></div>`);
 }
@@ -357,7 +357,7 @@ document.addEventListener('submit', (e) => {
     gm.destino = d.destino;
     if (!gm.mapa) { location.href = linksNavegar(d.destino).geo; return; }
     if (!pos) return toast('Toque em "Minha posição" primeiro.');
-    gm.mapa.rota(pos, d.destino).then((r) => { gm.resumo = r; rotaAtualizar(); }).catch((e) => toast('Rota não encontrada: ' + (e.message || e)));
+    gm.mapa.rota(pos, d.destino).then((r) => { gm.resumo = r; rotaAtualizar(); }).catch((e) => toast('Rota: ' + (e.message || e)));
     return;
   } else if (f.dataset.form === 'gm') {
     gm.chave = d.chave; if (gm.chave) localStorage.setItem('asx.gmaps', gm.chave); else localStorage.removeItem('asx.gmaps');
@@ -461,7 +461,8 @@ function montarMapa() {
   gm.mapa = null;
   carregarGoogle(gm.chave).then((g) => {
     if (!document.getElementById('gmapa')) return;
-    gm.mapa = new MapaTransito(g, el, pos);
+    gm.mapa = new MapaTransito(g, el, pos, gm.chave);
+    gm.mapa.onEscolher = (i) => { gm.resumo = gm.mapa.escolher(i); rotaAtualizar(); };
     if (gm.destino && pos) gm.mapa.rota(pos, gm.destino).then((r) => { gm.resumo = r; rotaAtualizar(); }).catch(() => {});
   }).catch((e) => { toast(e.message); el.innerHTML = `<p class="muted" style="padding:12px">${esc(e.message)}</p>`; });
 }

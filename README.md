@@ -38,7 +38,7 @@ No Android (Chrome): abrir a URL → menu → *Instalar app*.
 
 ## Chave do Google Maps (trânsito ao vivo)
 
-1. Em [console.cloud.google.com](https://console.cloud.google.com) crie um projeto e ative **Maps JavaScript API** e **Directions API**. O Google exige conta de faturamento com cartão, mas o uso pessoal fica dentro da cota gratuita mensal (10 mil carregamentos de mapa e milhares de rotas).
+1. Em [console.cloud.google.com](https://console.cloud.google.com) crie um projeto e ative **Maps JavaScript API** e **Routes API** (a antiga Directions API não pode mais ser ativada em projetos novos desde outubro de 2026). O Google exige conta de faturamento com cartão, mas o uso pessoal fica dentro da cota gratuita mensal: 10 mil carregamentos de mapa e 5 mil rotas com trânsito. Vale criar um alerta de orçamento de R$ 1 em *Faturamento → Orçamentos e alertas*.
 2. Em *APIs e serviços → Credenciais* crie uma **chave de API**. Em *Restrições de aplicativo* escolha "Sites" e adicione `https://leocoradi.github.io/*` (e `http://localhost:8080/*` para testar). Em *Restrições de API* marque só as duas APIs acima.
 3. No app, engrenagem → **Google Maps** → cole a chave. Ela fica no `localStorage` do aparelho e nunca vai para o repositório.
 
@@ -86,6 +86,10 @@ npx @gltf-transform/cli optimize scene.gltf asx.glb --compress meshopt --simplif
 
 Visualizador: `<model-viewer>` 4.7 (Google, Apache-2.0) e o decodificador meshopt (MIT), vendorados em `vendor/` para funcionar offline.
 
+## Continuidade
+
+`CLAUDE.md` tem as regras do projeto para agentes e `docs/ESTADO.md` tem o estado, as decisões e as pendências. Scripts de verificação em `tools/` (Playwright e `ws` como devDependencies: `npm i`).
+
 ## Estrutura
 
 ```
@@ -99,11 +103,13 @@ vendor/             model-viewer e decodificador meshopt
 assets/asx.glb      modelo 3D preto (CC-BY-4.0, ver asx-LICENSE.txt)
 src/obd.js          decodificador OBDb, ISO-TP, DTCs, ELM327 BLE, simulador
 src/media.js        links do YouTube/YouTube Music
-src/mapa.js         mapa do Google com trânsito, rota com tempo real e entrega ao Vela
+src/mapa.js         mapa do Google com trânsito, rota pela Routes API com tempo real e entrega ao Vela
 src/hudiy.js        cliente da API da central Hudiy (protobuf mínimo, mídia, navegação, OBD, teclas)
 src/signalset.js    sinais no formato OBDb v3
 sw.js               cache offline
 tests/              node --test
+tools/              central Hudiy falsa, capturas de tela, fluxo do mapa simulado
+docs/ESTADO.md      estado, decisões e pendências
 ```
 
 Créditos: tipografia Doto (Google Fonts), inspiração visual Nothing UI (Community, Zognest), dados OBD de OBDb, modelo 3D de mamont nikita (CC-BY-4.0).
