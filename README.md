@@ -10,7 +10,7 @@ Web app (PWA) para acompanhar o Mitsubishi ASX 2017/2018 2.0 16V MIVEC 4x2, câm
 - **Ficha**: motor, fluidos e capacidades, pneus, lâmpadas, velas, fusíveis.
 - **OBD**: leitura ao vivo via ELM327 Bluetooth LE (Web Bluetooth), códigos de falha (serviço 03), odômetro e contador de revisão do painel. Há um simulador para ver a tela sem adaptador.
 - **YouTube Music no rodapé**: player do YouTube embutido (API oficial de iframe). Cole o link de uma playlist ou música do YouTube Music; o rodapé mostra faixa e artista com anterior / play-pause / próxima e um painel de vídeo que abre e fecha. Playlists privadas não tocam fora do app do YouTube. Com a tela desligada o YouTube pausa a reprodução em navegadores; é regra da plataforma.
-- **Waze no Início**: mapa ao vivo oficial do Waze (embed.waze.com) centrado na sua posição, com o trânsito ao redor, e campo "Para onde?" que abre o Waze já roteando (deep link `waze.com/ul`). Instruções curva a curva dentro do app não existem: o Waze não tem API pública para isso fora do Android Auto.
+- **Trânsito no Início**: mapa do Google (API JavaScript oficial) com camada de trânsito ao vivo, sua posição e rota com tempo em trânsito agora, alternativas e lista de manobras. Precisa de uma chave de API sua (abaixo). O botão **Navegar no Vela** entrega o destino ao [Vela](https://github.com/PimpinPumpkin/Vela) pelo intent `geo:`; se o Vela não estiver instalado, o Android oferece outro app de mapas. Sem chave, o campo "Para onde?" abre o Vela direto.
 - **Na central Hudiy**, o rodapé e o Início passam a usar o que a central recebe do Android Auto: faixa tocando com controles e a manobra atual (ícone, distância, instrução).
 - **Backup**: ícone de engrenagem exporta e importa JSON. Os dados ficam no `localStorage` do aparelho.
 
@@ -36,6 +36,14 @@ O workflow em `.github/workflows/pages.yml` publica a raiz do repositório. Em *
 
 No Android (Chrome): abrir a URL → menu → *Instalar app*.
 
+## Chave do Google Maps (trânsito ao vivo)
+
+1. Em [console.cloud.google.com](https://console.cloud.google.com) crie um projeto e ative **Maps JavaScript API** e **Directions API**. O Google exige conta de faturamento com cartão, mas o uso pessoal fica dentro da cota gratuita mensal (10 mil carregamentos de mapa e milhares de rotas).
+2. Em *APIs e serviços → Credenciais* crie uma **chave de API**. Em *Restrições de aplicativo* escolha "Sites" e adicione `https://leocoradi.github.io/*` (e `http://localhost:8080/*` para testar). Em *Restrições de API* marque só as duas APIs acima.
+3. No app, engrenagem → **Google Maps** → cole a chave. Ela fica no `localStorage` do aparelho e nunca vai para o repositório.
+
+Os termos do Google Maps Platform não permitem usar os dados para guiar curva a curva no próprio app. Por isso o app mostra mapa, trânsito, rota e manobras, e a condução guiada é entregue ao Vela.
+
 ## OBD-II
 
 - Decodificador no formato **OBDb signalset v3** (`src/obd.js`, `src/signalset.js`), portado de `OBDb/.schemas`. Sinais padrão vêm de `OBDb/SAEJ1979`; os estendidos (odômetro `6A0 21AD`, contador de revisão `6A0 21BC`) de `OBDb/Mitsubishi-ASX`, confirmados pela comunidade em ASX 2020/2021. No 2017/2018 nacional, alguns podem não responder; o app mostra `—` e registra no log.
@@ -55,9 +63,9 @@ Android Auto só executa apps nativos de categorias aprovadas pelo Google; um we
 2. Copie `hudiy/applications.json` e `hudiy/applications_menu.json` para `~/.hudiy/share/config/`, ajustando a URL. Isso cria o item "ASX" no menu de aplicativos.
 3. Na tela OBD, toque em **Central Hudiy**. O app fala com `ws://localhost:44406` (porta `webSocketEndpointPort` da configuração), faz o hello da API 1.0, assina o status do OBD e envia os PIDs pelo `QueryObdDeviceRequest`. O protobuf dessas três mensagens é codificado à mão em `src/obd.js` (sem protobuf.js).
 4. O botão/gesto de voltar da central chama `history.back()` no app.
-5. Dentro do web view da central o app conecta sozinho à API (detecta o objeto `hudiy`), assina mídia, navegação e OBD, e mostra player e manobra. O YouTube Music tocando pelo Android Auto aparece no player; o Waze (ou Maps) em navegação aparece no card. Os botões do player injetam as teclas de mídia da central (`KeyEvent`).
+5. Dentro do web view da central o app conecta sozinho à API (detecta o objeto `hudiy`), assina mídia, navegação e OBD, e mostra player e manobra. O YouTube Music tocando pelo Android Auto aparece no player; o app de navegação em uso no Android Auto aparece no card. Os botões do player injetam as teclas de mídia da central (`KeyEvent`).
 
-Por que só na central: nem o YouTube Music nem o Waze têm API pública para um site ler o que toca ou as instruções no celular. Essa informação só sai do telefone pelo protocolo do Android Auto, e é a central que a recebe. A integração foi validada contra um servidor falso que fala o protocolo do `Api.proto` (hello, assinaturas, mídia, navegação, OBD, teclas); falta o teste na central real.
+Por que só na central: nem o YouTube Music nem os apps de navegação têm API pública para um site ler o que toca ou as instruções no celular. Essa informação só sai do telefone pelo protocolo do Android Auto, e é a central que a recebe. A integração foi validada contra um servidor falso que fala o protocolo do `Api.proto` (hello, assinaturas, mídia, navegação, OBD, teclas); falta o teste na central real.
 
 Limites: pela API do Hudiy só vão os PIDs padrão da ECU do motor (sem `ATSH`, então odômetro e contador de revisão do painel não são lidos por esse caminho). A central precisa de uma tela de 7" ou mais; o layout de tablet (768 px) é o que aparece.
 
@@ -90,7 +98,8 @@ src/car.js          modelo 3D e silhueta SVG com pontos de atenção
 vendor/             model-viewer e decodificador meshopt
 assets/asx.glb      modelo 3D preto (CC-BY-4.0, ver asx-LICENSE.txt)
 src/obd.js          decodificador OBDb, ISO-TP, DTCs, ELM327 BLE, simulador
-src/media.js        links do YouTube/YouTube Music e URLs do Waze (mapa e navegação)
+src/media.js        links do YouTube/YouTube Music
+src/mapa.js         mapa do Google com trânsito, rota com tempo real e entrega ao Vela
 src/hudiy.js        cliente da API da central Hudiy (protobuf mínimo, mídia, navegação, OBD, teclas)
 src/signalset.js    sinais no formato OBDb v3
 sw.js               cache offline

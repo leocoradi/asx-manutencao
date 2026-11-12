@@ -3,7 +3,8 @@ import { situacao, ordenar, consumo } from './plan.js';
 import { carro, carro3d, CARRO_3D } from './car.js';
 import { Elm327Ble, HudiyObd, Simulador, COMANDOS } from './obd.js';
 import { Hudiy, MSG, TECLA, mediaStatus, mediaMeta, navStatus, navDetalhes, navDistancia, imagemUrl } from './hudiy.js';
-import { alvoYoutube, wazeMapaUrl, wazeNavegarUrl, youtubeMusicUrl } from './media.js';
+import { alvoYoutube, youtubeMusicUrl } from './media.js';
+import { carregarGoogle, MapaTransito, linksNavegar } from './mapa.js';
 
 // --- Estado e persistência (localStorage + backup JSON) ---
 const KEY = 'asx.v1';
@@ -68,11 +69,12 @@ function inicio() {
       ${nav.iconeUrl ? `<img src="${nav.iconeUrl}" alt="">` : ''}
       <div class="stack" style="flex:1"><div class="num dist">${esc(nav.distancia || '')}</div><div class="desc">${esc(nav.descricao || 'Navegando')}</div><small class="muted">Navegação via central (Android Auto)</small></div>
     </section>` : ''}
-    <section class="card dark full waze-card">
-      <div class="row"><h2 style="margin:0">Waze</h2><button class="btn-ghost btn-sm" data-action="pos">${pos ? 'Atualizar posição' : 'Minha posição'}</button></div>
-      ${pos ? `<iframe class="waze" src="${wazeMapaUrl(pos.lat, pos.lon)}" title="Mapa ao vivo do Waze" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>`
-            : '<p class="muted" style="margin:8px 0">Mapa ao vivo com o trânsito ao redor. Toque em "Minha posição" e permita a localização.</p>'}
-      <form data-form="waze" class="row" style="margin-top:10px;gap:8px"><input name="destino" placeholder="Para onde?" required aria-label="Destino" maxlength="200"><button class="btn-sm" type="submit" style="background:var(--fg);color:var(--bg)">Navegar</button></form>
+    <section class="card dark full mapa-card">
+      <div class="row"><h2 style="margin:0">Trânsito</h2><button class="btn-ghost btn-sm" data-action="pos">${pos ? 'Atualizar posição' : 'Minha posição'}</button></div>
+      ${gm.chave ? '<div class="gmapa" id="gmapa" role="region" aria-label="Mapa do Google com trânsito ao vivo"></div>'
+                 : `<p class="muted" style="margin:8px 0">Mapa do Google com trânsito ao vivo e rota com tempo real. <button class="btn-ghost btn-sm" data-action="gm-config">Configurar chave do Google Maps</button></p>`}
+      <form data-form="rota" class="row" style="margin-top:10px;gap:8px"><input name="destino" placeholder="Para onde?" required aria-label="Destino" maxlength="200" value="${esc(gm.destino)}"><button class="btn-sm" type="submit" style="background:var(--fg);color:var(--bg)">${gm.chave ? 'Rota' : 'Navegar'}</button></form>
+      <div class="rota-info">${rotaHtml()}</div>
     </section>
     <section class="card dark">
       <h2>Odômetro</h2>
@@ -305,6 +307,12 @@ function dlgConfig() {
     <button data-action="exportar">Exportar JSON</button>
     <label class="btn btn-ghost" style="display:inline-flex;align-items:center;cursor:pointer">Importar JSON<input type="file" accept="application/json,.json" data-action="importar" hidden></label>
   </div>
+  <h2 style="margin-top:20px">Google Maps</h2>
+  <form data-form="gm">
+    <label>Chave da API (fica só neste aparelho)<input name="chave" autocomplete="off" spellcheck="false" placeholder="AIza…" value="${esc(gm.chave)}"></label>
+    <div class="actions"><button type="submit" class="btn-sm">Salvar chave</button></div>
+  </form>
+  <p class="muted"><small>Crie no console do Google Cloud com as APIs "Maps JavaScript" e "Directions" ativas e restrinja a chave ao domínio deste app. Uso pessoal cabe na cota gratuita.</small></p>
   <h2 style="margin-top:20px">Apagar tudo</h2>
   <div class="actions"><button class="btn-red" data-action="zerar">Apagar todos os registros</button><button class="btn-ghost" data-action="fechar">Fechar</button></div>`);
 }
@@ -323,7 +331,7 @@ async function importar(file) {
 // --- Eventos ---
 function formDados(f) {
   const fd = new FormData(f);
-  return { data: fd.get('data'), km: +fd.get('km'), litros: +fd.get('litros'), valor: +fd.get('valor'), custo: +fd.get('custo') || 0, obs: (fd.get('obs') || '').trim(), cheio: fd.get('cheio') === 'on', itens: fd.getAll('itens'), destino: (fd.get('destino') || '').trim(), url: (fd.get('url') || '').trim() };
+  return { data: fd.get('data'), km: +fd.get('km'), litros: +fd.get('litros'), valor: +fd.get('valor'), custo: +fd.get('custo') || 0, obs: (fd.get('obs') || '').trim(), cheio: fd.get('cheio') === 'on', itens: fd.getAll('itens'), destino: (fd.get('destino') || '').trim(), url: (fd.get('url') || '').trim(), chave: (fd.get('chave') || '').trim() };
 }
 function atualizaOdo(kmNovo, data) {
   if (kmNovo > S.odo.km) S.odo = { km: kmNovo, data: data > S.odo.data ? data : S.odo.data };
@@ -345,8 +353,15 @@ document.addEventListener('submit', (e) => {
     if (!alvo) return toast('Link do YouTube não reconhecido.');
     yt.alvo = alvo; localStorage.setItem('asx.yt', JSON.stringify(alvo)); yt.player?.destroy?.(); yt.player = null;
     dlg.close(); renderPlayer(true); return;
-  } else if (f.dataset.form === 'waze') {
-    window.open(wazeNavegarUrl(d.destino), '_blank', 'noopener'); return;
+  } else if (f.dataset.form === 'rota') {
+    gm.destino = d.destino;
+    if (!gm.mapa) { location.href = linksNavegar(d.destino).geo; return; }
+    if (!pos) return toast('Toque em "Minha posição" primeiro.');
+    gm.mapa.rota(pos, d.destino).then((r) => { gm.resumo = r; rotaAtualizar(); }).catch((e) => toast('Rota não encontrada: ' + (e.message || e)));
+    return;
+  } else if (f.dataset.form === 'gm') {
+    gm.chave = d.chave; if (gm.chave) localStorage.setItem('asx.gmaps', gm.chave); else localStorage.removeItem('asx.gmaps');
+    dlg.close(); render(); return;
   } else if (f.dataset.form === 'km') {
     S.odo = { km: d.km, data: hojeIso() }; toast('Odômetro atualizado.');
   }
@@ -368,6 +383,9 @@ document.addEventListener('click', (e) => {
     S[k] = S[k].filter((x) => x.id !== el.dataset.id); salvar(); render();
   }
   else if (a === 'pos') localizar(true);
+  else if (a === 'gm-config') dlgConfig();
+  else if (a === 'rota-alt') { gm.resumo = gm.mapa.escolher(+el.dataset.i); rotaAtualizar(); }
+  else if (a === 'rota-limpar') { gm.mapa?.limpar(); gm.resumo = null; gm.destino = ''; rotaAtualizar(); }
   else if (a === 'yt-config') dlgYoutube();
   else if (a === 'yt-abrir') { document.querySelector('.ytwrap')?.classList.toggle('aberto'); }
   else if (a === 'yt-remover') { yt.alvo = null; localStorage.removeItem('asx.yt'); yt.player?.destroy?.(); yt.player = null; dlg.close(); renderPlayer(true); }
@@ -400,7 +418,7 @@ function montarCarro3d() {
 }
 main.addEventListener('keydown', (e) => { const h = e.target.closest('.hot'); if (h && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); h.click(); } });
 
-// --- Central Hudiy: player no rodapé e manobra do Android Auto (Waze, Maps) no Início ---
+// --- Central Hudiy: player no rodapé e manobra do Android Auto no Início ---
 const central = new Hudiy();
 const midia = { titulo: '', artista: '', posicao: '', duracao: '', tocando: false, capaUrl: null };
 const nav = { ativo: false, descricao: '', distancia: '', iconeUrl: null };
@@ -420,16 +438,46 @@ function renderNav() {
   el.querySelector('.desc').textContent = nav.descricao || 'Navegando';
   const img = el.querySelector('img'); if (img && nav.iconeUrl) img.src = nav.iconeUrl;
 }
-// --- Posição (mapa do Waze) ---
+// --- Posição (mapa de trânsito) ---
 let pos = (() => { try { const p = JSON.parse(localStorage.getItem('asx.pos')); return Number.isFinite(p?.lat) && Number.isFinite(p?.lon) ? p : null; } catch { return null; } })();
 function localizar(pedido) {
   if (!navigator.geolocation) return toast('Sem geolocalização neste navegador.');
   navigator.geolocation.getCurrentPosition((g) => {
     pos = { lat: g.coords.latitude, lon: g.coords.longitude };
     localStorage.setItem('asx.pos', JSON.stringify(pos));
-    const f = main.querySelector('iframe.waze'); if (f) f.src = wazeMapaUrl(pos.lat, pos.lon); else render();
+    if (gm.mapa) gm.mapa.posicao(pos); else if (!main.querySelector('.mapa-card .gmapa')) { if (main.querySelector('.mapa-card')) render(); }
+    vigiarPosicao();
   }, (e) => { if (pedido) toast(e.code === 1 ? 'Permissão de localização negada.' : 'Não foi possível obter a posição.'); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
 }
+let vigia;
+function vigiarPosicao() {
+  vigia ??= navigator.geolocation.watchPosition((g) => { pos = { lat: g.coords.latitude, lon: g.coords.longitude }; gm.mapa?.posicao(pos); }, () => {}, { enableHighAccuracy: true, maximumAge: 5000 });
+}
+
+// --- Mapa do Google com trânsito (chave do usuário) ---
+const gm = { chave: localStorage.getItem('asx.gmaps') || '', mapa: null, resumo: null, destino: '' };
+function montarMapa() {
+  const el = document.getElementById('gmapa'); if (!el || !gm.chave) return;
+  gm.mapa = null;
+  carregarGoogle(gm.chave).then((g) => {
+    if (!document.getElementById('gmapa')) return;
+    gm.mapa = new MapaTransito(g, el, pos);
+    if (gm.destino && pos) gm.mapa.rota(pos, gm.destino).then((r) => { gm.resumo = r; rotaAtualizar(); }).catch(() => {});
+  }).catch((e) => { toast(e.message); el.innerHTML = `<p class="muted" style="padding:12px">${esc(e.message)}</p>`; });
+}
+function rotaHtml() {
+  const r = gm.resumo; if (!r) return '';
+  const a = r.rotas[r.atual];
+  const l = linksNavegar(gm.destino, a.fim.lat, a.fim.lng);
+  return `
+    <div class="row" style="margin-top:10px;align-items:flex-end">
+      <div><div class="num mid">${esc(a.tempo)}</div><small class="muted">${esc(a.distancia)} · via ${esc(a.via || '—')}${a.tempo !== a.tempoSemTransito ? ` · sem trânsito ${esc(a.tempoSemTransito)}` : ''}</small></div>
+      <div class="actions" style="margin:0"><a class="btn btn-sm" style="background:var(--fg);color:var(--bg);text-decoration:none;display:inline-flex;align-items:center" href="${l.geo}">Navegar no Vela</a><button class="btn-ghost btn-sm" data-action="rota-limpar">Limpar</button></div>
+    </div>
+    ${r.rotas.length > 1 ? `<div class="alts">${r.rotas.map((x) => `<button class="chip ${x.i === r.atual ? 'ok' : ''}" data-action="rota-alt" data-i="${x.i}" aria-pressed="${x.i === r.atual}">${esc(x.tempo)} · ${esc(x.via || x.distancia)}</button>`).join('')}</div>` : ''}
+    <details class="passos"><summary>${a.passos.length} manobras até ${esc(a.endereco)}</summary><ol>${a.passos.map((p) => `<li>${esc(p.texto)} <small class="muted">${esc(p.distancia)}</small></li>`).join('')}</ol></details>`;
+}
+function rotaAtualizar() { const el = main.querySelector('.rota-info'); if (el) el.innerHTML = rotaHtml(); }
 // Atualiza a posição sem perguntar quando a permissão já foi dada.
 navigator.permissions?.query({ name: 'geolocation' }).then((p) => { if (p.state === 'granted') localizar(false); }).catch(() => {});
 
@@ -525,7 +573,7 @@ function render() {
   const view = VIEWS[path] ? path : 'inicio';
   main.innerHTML = VIEWS[view](new URLSearchParams(qs));
   document.querySelectorAll('.nav a').forEach((a) => a.toggleAttribute('aria-current', a.dataset.view === view));
-  if (view === 'inicio') montarCarro3d();
+  if (view === 'inicio') { montarCarro3d(); montarMapa(); }
 }
 window.addEventListener('hashchange', () => { render(); main.focus({ preventScroll: true }); window.scrollTo(0, 0); });
 render();

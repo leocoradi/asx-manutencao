@@ -119,7 +119,12 @@ dialog h2 { margin-top: 0; }
 .player button.capa { display: flex; align-items: center; justify-content: center; padding: 0; min-height: 0; cursor: pointer; }
 .player button.capa i { width: 0; height: 0; border-left: 14px solid var(--red); border-top: 9px solid transparent; border-bottom: 9px solid transparent; margin-left: 4px; }
 .player .atalho.app { margin-left: auto; }
-iframe.waze { width: 100%; aspect-ratio: 16 / 10; max-height: 360px; border: 0; border-radius: 12px; background: var(--bg-2); display: block; }
+.gmapa { width: 100%; aspect-ratio: 16 / 10; max-height: 360px; border-radius: 12px; overflow: hidden; background: var(--bg-2); }
+.alts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.alts .chip { background: transparent; min-height: 0; cursor: pointer; }
+.passos { margin-top: 8px; font-size: 14px; }
+.passos summary { cursor: pointer; color: var(--fg-dim); }
+.passos ol { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 6px; }
 .player .capa { width: 48px; height: 48px; border-radius: 10px; background: var(--bg-2); object-fit: cover; flex: none; border: 1px dashed var(--line); }
 .player .info { flex: 1; min-width: 0; overflow: hidden; }
 .player .t, .player .d { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -130,7 +135,6 @@ iframe.waze { width: 100%; aspect-ratio: 16 / 10; max-height: 360px; border: 0; 
 .player .ctl button.play { background: var(--fg); color: var(--bg); border: 0; }
 .player .atalho { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; color: var(--fg); text-decoration: none; border: 1px dashed var(--line); border-radius: 999px; padding: 8px 14px; font-size: 14px; }
 .player .atalho i { width: 10px; height: 10px; border-radius: 50%; background: var(--red); display: inline-block; }
-.player .atalho.waze i { background: #33ccff; }
 .navcard { display: flex; align-items: center; gap: 16px; }
 .navcard img { width: 64px; height: 64px; object-fit: contain; filter: invert(1); flex: none; }
 .navcard .dist { font-size: 40px; line-height: 1; }
@@ -212,8 +216,8 @@ iframe.waze { width: 100%; aspect-ratio: 16 / 10; max-height: 360px; border: 0; 
   .card { padding: 12px 14px; }
   .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-flow: dense; gap: 10px; }
   .grid .span-2 { grid-column: span 2; }
-  .grid .waze-card { grid-column: span 1; }
-  iframe.waze { aspect-ratio: 4 / 3; max-height: 170px; }
+  .grid .mapa-card { grid-column: span 2; }
+  .gmapa { aspect-ratio: 16 / 9; max-height: 190px; }
   .car3d { aspect-ratio: 16 / 7; max-height: 190px; }
   .big { font-size: 30px; }
   .card .row { flex-wrap: wrap; row-gap: 6px; }
