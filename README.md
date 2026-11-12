@@ -9,7 +9,9 @@ Web app (PWA) para acompanhar o Mitsubishi ASX 2017/2018 2.0 16V MIVEC 4x2, câm
 - **Combustível**: registro de abastecimentos, km/L por tanque cheio, média e custo por km.
 - **Ficha**: motor, fluidos e capacidades, pneus, lâmpadas, velas, fusíveis.
 - **OBD**: leitura ao vivo via ELM327 Bluetooth LE (Web Bluetooth), códigos de falha (serviço 03), odômetro e contador de revisão do painel. Há um simulador para ver a tela sem adaptador.
-- **Player e navegação**: na central Hudiy, o rodapé mostra o que está tocando (capa, faixa, artista, posição) com anterior / play-pause / próxima, e o Início mostra a manobra atual do Android Auto (ícone, distância, instrução). No celular, o rodapé tem atalhos para abrir YouTube Music e Waze.
+- **YouTube Music no rodapé**: player do YouTube embutido (API oficial de iframe). Cole o link de uma playlist ou música do YouTube Music; o rodapé mostra faixa e artista com anterior / play-pause / próxima e um painel de vídeo que abre e fecha. Playlists privadas não tocam fora do app do YouTube. Com a tela desligada o YouTube pausa a reprodução em navegadores; é regra da plataforma.
+- **Waze no Início**: mapa ao vivo oficial do Waze (embed.waze.com) centrado na sua posição, com o trânsito ao redor, e campo "Para onde?" que abre o Waze já roteando (deep link `waze.com/ul`). Instruções curva a curva dentro do app não existem: o Waze não tem API pública para isso fora do Android Auto.
+- **Na central Hudiy**, o rodapé e o Início passam a usar o que a central recebe do Android Auto: faixa tocando com controles e a manobra atual (ícone, distância, instrução).
 - **Backup**: ícone de engrenagem exporta e importa JSON. Os dados ficam no `localStorage` do aparelho.
 
 Base técnica em `src/data.js`, extraída do manual do proprietário e do manual do Copilito da ASX (intervalos de uso severo no Brasil).
@@ -88,6 +90,7 @@ src/car.js          modelo 3D e silhueta SVG com pontos de atenção
 vendor/             model-viewer e decodificador meshopt
 assets/asx.glb      modelo 3D preto (CC-BY-4.0, ver asx-LICENSE.txt)
 src/obd.js          decodificador OBDb, ISO-TP, DTCs, ELM327 BLE, simulador
+src/media.js        links do YouTube/YouTube Music e URLs do Waze (mapa e navegação)
 src/hudiy.js        cliente da API da central Hudiy (protobuf mínimo, mídia, navegação, OBD, teclas)
 src/signalset.js    sinais no formato OBDb v3
 sw.js               cache offline
