@@ -1,5 +1,7 @@
 # Plano de refatoração: abas, tela de Navegação e mapa
 
+> **Andamento:** etapas 1 a 4 e a opção A do mapa (Navigation SDK) foram implementadas; o dono escolheu a opção A. Falta testar em aparelho e executar as etapas 5 (web embutido no APK) e os itens menores listados em `docs/ESTADO.md`. A view nativa ficou por cima da WebView (e não por baixo, como proposto na seção 5), para o toque ir direto ao mapa.
+
 Revisão feita após o primeiro APK rodar em aparelho real (capturas em paisagem, Android com barra de status e de navegação sobrepostas). Este documento é o roteiro; `docs/ESTADO.md` continua sendo o registro do que está pronto.
 
 ## 1. Defeitos vistos nas capturas do APK (corrigir primeiro)
