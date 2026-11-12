@@ -68,7 +68,7 @@ function inicio() {
       ${nav.iconeUrl ? `<img src="${nav.iconeUrl}" alt="">` : ''}
       <div class="stack" style="flex:1"><div class="num dist">${esc(nav.distancia || '')}</div><div class="desc">${esc(nav.descricao || 'Navegando')}</div><small class="muted">Navegação via central (Android Auto)</small></div>
     </section>` : ''}
-    <section class="card dark" style="grid-column:1/-1">
+    <section class="card dark full waze-card">
       <div class="row"><h2 style="margin:0">Waze</h2><button class="btn-ghost btn-sm" data-action="pos">${pos ? 'Atualizar posição' : 'Minha posição'}</button></div>
       ${pos ? `<iframe class="waze" src="${wazeMapaUrl(pos.lat, pos.lon)}" title="Mapa ao vivo do Waze" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>`
             : '<p class="muted" style="margin:8px 0">Mapa ao vivo com o trânsito ao redor. Toque em "Minha posição" e permita a localização.</p>'}
@@ -158,7 +158,7 @@ function combustivel() {
   return `
   <h1 style="margin:8px 0 12px">Combustível</h1>
   <div class="grid">
-    <section class="card">
+    <section class="card span-2">
       <h2>Novo abastecimento</h2>
       <form data-form="fuel">
         <div class="grid-2">
