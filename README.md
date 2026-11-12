@@ -9,8 +9,8 @@ Web app (PWA) para acompanhar o Mitsubishi ASX 2017/2018 2.0 16V MIVEC 4x2, câm
 - **Combustível**: registro de abastecimentos, km/L por tanque cheio, média e custo por km.
 - **Ficha**: motor, fluidos e capacidades, pneus, lâmpadas, velas, fusíveis.
 - **OBD**: leitura ao vivo via ELM327 Bluetooth LE (Web Bluetooth), códigos de falha (serviço 03), odômetro e contador de revisão do painel. Há um simulador para ver a tela sem adaptador.
-- **YouTube Music no rodapé**: player do YouTube embutido (API oficial de iframe). Cole o link de uma playlist ou música do YouTube Music; o rodapé mostra faixa e artista com anterior / play-pause / próxima e um painel de vídeo que abre e fecha. Playlists privadas não tocam fora do app do YouTube. Com a tela desligada o YouTube pausa a reprodução em navegadores; é regra da plataforma.
-- **Trânsito no Início**: mapa do Google (API JavaScript oficial) com camada de trânsito ao vivo, sua posição e rota com tempo em trânsito agora, alternativas e lista de manobras. Precisa de uma chave de API sua (abaixo). O botão **Navegar no Vela** entrega o destino ao [Vela](https://github.com/PimpinPumpkin/Vela) pelo intent `geo:`; se o Vela não estiver instalado, o Android oferece outro app de mapas. Sem chave, o campo "Para onde?" abre o Vela direto.
+- **Rodapé de mídia (no APK)**: mostra o que o celular está tocando (YouTube Music, Spotify…) com capa, faixa, artista, posição e anterior / play-pause / próxima. Lê a sessão de mídia do Android pelo app companheiro; no navegador o rodapé fica vazio.
+- **Trânsito no Início**: mapa do Google (API JavaScript oficial) com camada de trânsito ao vivo, sua posição e rota pela Routes API com tempo em trânsito agora, alternativas e lista de manobras. Precisa de uma chave de API sua (abaixo). O botão **Navegar no Vela** entrega o destino ao [Vela](https://github.com/PimpinPumpkin/Vela) pelo intent `geo:`. No APK, a manobra atual do Vela, Google Maps ou Waze aparece em um card no topo do Início, lida da notificação de navegação.
 - **Na central Hudiy**, o rodapé e o Início passam a usar o que a central recebe do Android Auto: faixa tocando com controles e a manobra atual (ícone, distância, instrução).
 - **Backup**: ícone de engrenagem exporta e importa JSON. Os dados ficam no `localStorage` do aparelho.
 
@@ -36,9 +36,21 @@ O workflow em `.github/workflows/pages.yml` publica a raiz do repositório. Em *
 
 No Android (Chrome): abrir a URL → menu → *Instalar app*.
 
+## App Android (APK)
+
+O APK é uma casca fina em Kotlin (`android/`): uma WebView com o app publicado mais o que o navegador não consegue fazer:
+
+- **Sessão de mídia**: lê o que está tocando no celular e manda os controles (`MediaSessionManager`).
+- **Manobra do navegador**: lê a notificação em andamento do Vela, Google Maps ou Waze (`NotificationListenerService`) e mostra no Início.
+- **Intents**: "Navegar no Vela" e links externos abrem os apps do Android; a geolocalização pede a permissão do sistema.
+
+Instalação: baixe `asx-manutencao.apk` do artefato do workflow **Android** (aba Actions) ou da release de uma tag `v*`, instale (permitir fontes desconhecidas) e, no rodapé, toque em **Permitir** para dar "Acesso a notificações" ao app. Sem isso, mídia e manobras não aparecem.
+
+Numa central multimídia Android, instale o APK e defina como tela inicial. Para assinatura estável entre versões, cadastre os secrets `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_SENHA`, `ANDROID_CHAVE` e `ANDROID_CHAVE_SENHA` no repositório; sem eles o APK sai com a chave de debug do runner e atualizar exige desinstalar antes.
+
 ## Chave do Google Maps (trânsito ao vivo)
 
-1. Em [console.cloud.google.com](https://console.cloud.google.com) crie um projeto e ative **Maps JavaScript API** e **Directions API**. O Google exige conta de faturamento com cartão, mas o uso pessoal fica dentro da cota gratuita mensal (10 mil carregamentos de mapa e milhares de rotas).
+1. Em [console.cloud.google.com](https://console.cloud.google.com) crie um projeto e ative **Maps JavaScript API** e **Routes API** (a antiga Directions API não pode mais ser ativada em projetos novos desde outubro de 2026). O Google exige conta de faturamento com cartão, mas o uso pessoal fica dentro da cota gratuita mensal: 10 mil carregamentos de mapa e 5 mil rotas com trânsito. Vale criar um alerta de orçamento de R$ 1 em *Faturamento → Orçamentos e alertas*.
 2. Em *APIs e serviços → Credenciais* crie uma **chave de API**. Em *Restrições de aplicativo* escolha "Sites" e adicione `https://leocoradi.github.io/*` (e `http://localhost:8080/*` para testar). Em *Restrições de API* marque só as duas APIs acima.
 3. No app, engrenagem → **Google Maps** → cole a chave. Ela fica no `localStorage` do aparelho e nunca vai para o repositório.
 
@@ -86,6 +98,10 @@ npx @gltf-transform/cli optimize scene.gltf asx.glb --compress meshopt --simplif
 
 Visualizador: `<model-viewer>` 4.7 (Google, Apache-2.0) e o decodificador meshopt (MIT), vendorados em `vendor/` para funcionar offline.
 
+## Continuidade
+
+`CLAUDE.md` tem as regras do projeto para agentes e `docs/ESTADO.md` tem o estado, as decisões e as pendências. Scripts de verificação em `tools/` (Playwright e `ws` como devDependencies: `npm i`).
+
 ## Estrutura
 
 ```
@@ -98,12 +114,13 @@ src/car.js          modelo 3D e silhueta SVG com pontos de atenção
 vendor/             model-viewer e decodificador meshopt
 assets/asx.glb      modelo 3D preto (CC-BY-4.0, ver asx-LICENSE.txt)
 src/obd.js          decodificador OBDb, ISO-TP, DTCs, ELM327 BLE, simulador
-src/media.js        links do YouTube/YouTube Music
-src/mapa.js         mapa do Google com trânsito, rota com tempo real e entrega ao Vela
+src/mapa.js         mapa do Google com trânsito, rota pela Routes API com tempo real e entrega ao Vela
 src/hudiy.js        cliente da API da central Hudiy (protobuf mínimo, mídia, navegação, OBD, teclas)
 src/signalset.js    sinais no formato OBDb v3
 sw.js               cache offline
 tests/              node --test
+tools/              central Hudiy falsa, capturas de tela, fluxo do mapa simulado
+docs/ESTADO.md      estado, decisões e pendências
 ```
 
 Créditos: tipografia Doto (Google Fonts), inspiração visual Nothing UI (Community, Zognest), dados OBD de OBDb, modelo 3D de mamont nikita (CC-BY-4.0).

@@ -28,17 +28,54 @@ export function carregarGoogle(chave) {
   }));
 }
 
+// Polyline codificada do Google -> [{lat,lng}] (algoritmo de codificação de polilinhas, precisão 1e-5).
+export function decodificarPolyline(str) {
+  const pts = []; let i = 0, lat = 0, lng = 0;
+  while (i < str.length) {
+    for (const eixo of ['lat', 'lng']) {
+      let r = 0, shift = 0, b;
+      do { b = str.charCodeAt(i++) - 63; r |= (b & 31) << shift; shift += 5; } while (b >= 32);
+      const d = r & 1 ? ~(r >> 1) : r >> 1;
+      if (eixo === 'lat') lat += d; else lng += d;
+    }
+    pts.push({ lat: lat / 1e5, lng: lng / 1e5 });
+  }
+  return pts;
+}
+
+// Routes API (substituta da Directions API, que projetos novos não conseguem mais ativar).
+// TRAFFIC_AWARE devolve a duração com o trânsito de agora; staticDuration é sem trânsito.
+const CAMPOS = 'routes.description,routes.duration,routes.staticDuration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.localizedValues,routes.legs.endLocation,routes.legs.steps.navigationInstruction,routes.legs.steps.localizedValues';
+export async function calcularRotas(chave, pos, destino, fetchFn = fetch) {
+  const r = await fetchFn('https://routes.googleapis.com/directions/v2:computeRoutes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': chave, 'X-Goog-FieldMask': CAMPOS },
+    body: JSON.stringify({
+      origin: { location: { latLng: { latitude: pos.lat, longitude: pos.lon ?? pos.lng } } },
+      destination: { address: destino }, travelMode: 'DRIVE', routingPreference: 'TRAFFIC_AWARE',
+      computeAlternativeRoutes: true, languageCode: 'pt-BR', regionCode: 'BR', units: 'METRIC',
+    }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error?.message || `Routes API: HTTP ${r.status}`);
+  return (j.routes ?? []).map((rt, i) => ({
+    i, via: rt.description || '', distancia: rt.localizedValues?.distance?.text || `${(rt.distanceMeters / 1000).toFixed(1)} km`,
+    tempo: rt.localizedValues?.duration?.text || rt.duration, tempoSemTransito: rt.localizedValues?.staticDuration?.text || rt.staticDuration,
+    fim: { lat: rt.legs?.at(-1)?.endLocation?.latLng?.latitude, lng: rt.legs?.at(-1)?.endLocation?.latLng?.longitude },
+    pontos: decodificarPolyline(rt.polyline?.encodedPolyline || ''),
+    passos: (rt.legs ?? []).flatMap((l) => l.steps ?? []).map((st) => ({ texto: textoDeHtml(st.navigationInstruction?.instructions), distancia: st.localizedValues?.distance?.text || '' })).filter((p) => p.texto),
+  }));
+}
+
 export class MapaTransito {
-  #g; #mapa; #transito; #marcador; #dir; #render; #rotas = null; #indice = 0;
-  constructor(g, el, pos) {
-    this.#g = g;
+  #g; #mapa; #transito; #marcador; #linhas = []; #destinoMarc; #rotas = null; #indice = 0; #chave;
+  constructor(g, el, pos, chave) {
+    this.#g = g; this.#chave = chave;
     this.#mapa = new g.Map(el, {
-      center: pos ?? { lat: -15.78, lng: -47.93 }, zoom: pos ? 14 : 4, disableDefaultUI: true, zoomControl: true, gestureHandling: 'greedy',
+      center: pos ? { lat: pos.lat, lng: pos.lon } : { lat: -15.78, lng: -47.93 }, zoom: pos ? 14 : 4, disableDefaultUI: true, zoomControl: true, gestureHandling: 'greedy',
       colorScheme: g.ColorScheme?.DARK ?? 'DARK', clickableIcons: false,
     });
     this.#transito = new g.TrafficLayer(); this.#transito.setMap(this.#mapa);
-    this.#dir = new g.DirectionsService();
-    this.#render = new g.DirectionsRenderer({ map: this.#mapa, suppressMarkers: false, polylineOptions: { strokeColor: '#4fc3f7', strokeWeight: 6 } });
     if (pos) this.posicao(pos);
   }
   posicao(pos) {
@@ -47,26 +84,27 @@ export class MapaTransito {
     this.#marcador.setCenter(centro);
     if (!this.#rotas) this.#mapa.panTo(centro);
   }
-  // Rota de carro saindo da posição, com tempo em trânsito agora e alternativas.
   async rota(pos, destino) {
-    const r = await this.#dir.route({
-      origin: { lat: pos.lat, lng: pos.lon ?? pos.lng }, destination: destino, travelMode: 'DRIVING',
-      drivingOptions: { departureTime: new Date(), trafficModel: 'BEST_GUESS' }, provideRouteAlternatives: true, region: 'BR', language: 'pt-BR',
-    });
-    this.#rotas = r; this.#indice = 0;
-    this.#render.setDirections(r); this.#render.setRouteIndex(0);
+    const rotas = await calcularRotas(this.#chave, pos, destino);
+    if (!rotas.length) throw new Error('nenhuma rota devolvida');
+    this.#rotas = rotas; this.#desenhar(0);
     return this.resumo();
   }
-  escolher(i) { this.#indice = i; this.#render.setRouteIndex(i); return this.resumo(); }
-  limpar() { this.#rotas = null; this.#render.set('directions', null); }
-  resumo() {
-    if (!this.#rotas) return null;
-    const rotas = this.#rotas.routes.map((rt, i) => {
-      const leg = rt.legs[0];
-      return { i, via: rt.summary, distancia: leg.distance.text, tempo: leg.duration_in_traffic?.text ?? leg.duration.text, tempoSemTransito: leg.duration.text,
-        fim: { lat: leg.end_location.lat(), lng: leg.end_location.lng() }, endereco: leg.end_address,
-        passos: leg.steps.map((s) => ({ texto: textoDeHtml(s.instructions), distancia: s.distance.text })) };
+  escolher(i) { this.#desenhar(i); return this.resumo(); }
+  limpar() { this.#rotas = null; this.#apagar(); }
+  #apagar() { for (const l of this.#linhas) l.setMap(null); this.#linhas = []; this.#destinoMarc?.setMap(null); this.#destinoMarc = null; }
+  #desenhar(i) {
+    this.#indice = i; this.#apagar();
+    const g = this.#g, limites = new g.LatLngBounds();
+    this.#rotas.forEach((rt, k) => {
+      const l = new g.Polyline({ map: this.#mapa, path: rt.pontos, strokeColor: k === i ? '#4fc3f7' : '#6b6b6b', strokeOpacity: k === i ? 1 : 0.7, strokeWeight: k === i ? 6 : 4, zIndex: k === i ? 5 : 1 });
+      l.addListener('click', () => this.onEscolher?.(k));
+      this.#linhas.push(l);
+      rt.pontos.forEach((p) => limites.extend(p));
     });
-    return { atual: this.#indice, rotas };
+    const fim = this.#rotas[i].fim;
+    if (Number.isFinite(fim.lat)) this.#destinoMarc = new g.Circle({ map: this.#mapa, center: fim, radius: 30, fillColor: '#d71921', fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 2, zIndex: 10 });
+    if (!limites.isEmpty()) this.#mapa.fitBounds(limites, 40);
   }
+  resumo() { return this.#rotas ? { atual: this.#indice, rotas: this.#rotas } : null; }
 }

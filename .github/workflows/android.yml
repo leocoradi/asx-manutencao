@@ -1,0 +1,38 @@
+name: Android
+on:
+  push:
+    branches: [main]
+    paths: ['android/**', '.github/workflows/android.yml']
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      # O runner ubuntu-latest já tem o SDK em $ANDROID_HOME; o AGP baixa platform e build-tools que faltarem.
+      - run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '8.14.3' }
+      # Assinatura estável (opcional): secrets ANDROID_KEYSTORE_B64, ANDROID_KEYSTORE_SENHA, ANDROID_CHAVE, ANDROID_CHAVE_SENHA.
+      # Sem eles o APK sai com a chave de debug do runner e atualizar exige desinstalar.
+      - name: Keystore
+        env: { KS: '${{ secrets.ANDROID_KEYSTORE_B64 }}' }
+        if: env.KS != ''
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > "$RUNNER_TEMP/asx.jks"
+          echo "ASX_KEYSTORE=$RUNNER_TEMP/asx.jks" >> "$GITHUB_ENV"
+          echo "ASX_KEYSTORE_SENHA=${{ secrets.ANDROID_KEYSTORE_SENHA }}" >> "$GITHUB_ENV"
+          echo "ASX_CHAVE=${{ secrets.ANDROID_CHAVE }}" >> "$GITHUB_ENV"
+          echo "ASX_CHAVE_SENHA=${{ secrets.ANDROID_CHAVE_SENHA }}" >> "$GITHUB_ENV"
+      - run: gradle -p android assembleRelease --no-daemon
+      - run: cp android/app/build/outputs/apk/release/app-release.apk asx-manutencao.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: asx-manutencao-apk, path: asx-manutencao.apk }
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v')
+        with: { files: asx-manutencao.apk }

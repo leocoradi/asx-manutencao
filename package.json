@@ -4,6 +4,12 @@
   "type": "module",
   "scripts": {
     "start": "python3 -m http.server 8080",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "shots": "node tools/screens.cjs shots",
+    "fake-hudiy": "node tools/fake-hudiy.mjs assets/icon-512.png"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0",
+    "ws": "^8.18.0"
   }
 }
