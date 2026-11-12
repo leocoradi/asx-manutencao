@@ -4,6 +4,8 @@ Documento de continuidade: o que existe, por que está assim, o que falta. Atual
 
 ## Objetivo
 
+> **Atualizado:** o objetivo passou a ser uma central multimídia dedicada (Galaxy Tab S6 Lite no painel, sem projeção do celular). A reavaliação e a nova ordem de execução estão em `docs/CENTRAL.md`; o texto abaixo descreve a fase anterior.
+
 Web app (PWA) para acompanhar um Mitsubishi ASX 2017/2018 2.0 16V MIVEC 4x2 manual: manutenção, combustível, ficha técnica, OBD-II, com uso no celular e em central multimídia. Gratuito, sem backend, dados só no aparelho, visual inspirado no Nothing UI.
 
 ## O que está pronto

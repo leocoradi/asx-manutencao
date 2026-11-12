@@ -1,6 +1,6 @@
 # Guia para agentes neste repositório
 
-Leia também `docs/ESTADO.md` (o que existe, decisões, pendências) e `docs/PLANO.md` (roteiro da refatoração de abas, tela de Navegação e mapa) antes de mudar qualquer coisa.
+Leia também `docs/ESTADO.md` (o que existe, decisões, pendências) e `docs/CENTRAL.md` (objetivo atual: central multimídia dedicada num tablet no painel, e a ordem de execução) antes de mudar qualquer coisa. `docs/PLANO.md` é histórico da fase em que o celular era a tela principal.
 
 ## Regras do projeto
 
