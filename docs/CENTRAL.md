@@ -2,6 +2,8 @@
 
 Objetivo novo: o APK é a **central principal** de um Galaxy Tab S6 Lite fixo no painel do ASX, substituindo Android Auto e CarPlay, **sem projeção do celular**. Ligar e despertar o tablet com o carro já está resolvido fora do app.
 
+**Restrição do dono:** fora do carro o tablet continua um tablet comum. Nada de reset de fábrica, nada de travar o aparelho, nada de trocar a tela inicial do Android. A central só assume a tela quando o tablet está no carro.
+
 Este documento substitui as partes de `docs/PLANO.md` que assumiam o celular como tela principal. `docs/ESTADO.md` continua sendo o registro do que está pronto.
 
 ## Lacunas do APK atual para esse objetivo
@@ -11,23 +13,26 @@ Este documento substitui as partes de `docs/PLANO.md` que assumiam o celular com
 | A interface é baixada do GitHub Pages a cada abertura | A WebView carrega `https://<usuario>.github.io/asx-manutencao/` | Sem o hotspot do celular ligado, a central abre vazia ou com a versão em cache |
 | OBD por Bluetooth não funciona dentro do APK | A WebView do Android não implementa Web Bluetooth (`navigator.bluetooth` não existe) | O botão "Conectar Bluetooth" só funciona no Chrome, não no app |
 | Alvos de toque de 44 px e texto de 15 px | Pensados para celular na mão | Abaixo do mínimo do Google para telas de carro: 76 dp de alvo, 32 dp de texto principal e 24 dp de secundário |
-| Nada impede sair do app | É um app comum | Um toque acidental em Início ou Recentes tira a central da tela |
+| Nada impede sair do app no carro | É um app comum | Um toque acidental em Início ou Recentes tira a central da tela |
 | Avisos leem as notificações **do tablet** | O `NotificationListenerService` só vê o aparelho onde roda | Mensagens que chegam no celular não aparecem, a menos que o app (ex.: WhatsApp) esteja vinculado também no tablet |
 
-## 1. Launcher e retenção de tela (kiosk)
+## 1. Modo carro: tela cheia e retenção só dentro do carro
 
-Três camadas, da mais simples à mais rígida. As duas primeiras não exigem reset do tablet.
+Como o tablet precisa funcionar normalmente fora do carro, **ficam descartados** o modo quiosque com Device Owner (exige reset e trava o aparelho para todos os usos) e o app como tela inicial padrão (substituiria a tela inicial da Samsung o tempo todo). No lugar, um **modo carro** que liga e desliga sozinho.
 
-1. **App como tela inicial (HOME).** A `MainActivity` declara `CATEGORY_HOME` e `CATEGORY_DEFAULT`; nas configurações do Android o ASX vira o "app de tela inicial". O botão Início sempre volta para a central, e ela abre sozinha ao ligar o tablet.
-   - Orientação fixa em paisagem (`screenOrientation="sensorLandscape"`), barras do sistema escondidas em modo imersivo o tempo todo (já existe em paisagem) e tela sempre acesa (já existe).
-   - Bloqueio de tela do Android em "Nenhum".
-2. **Fixar app (screen pinning) a partir do próprio app.** `startLockTask()` sem dono do dispositivo: o Android fixa a central e só sai segurando Voltar + Recentes. Impede saída acidental, mas também bloqueia abrir o Waze, então só vale com a opção 3.
-3. **Modo quiosque de verdade (Device Owner), opcional.** O app vira dono do dispositivo com `adb shell dpm set-device-owner br.asx.manutencao/.Administrador`.
-   - Exige o tablet **sem nenhuma conta** no momento do comando (na prática, depois de restaurar a fábrica). Contas podem ser adicionadas depois, mas confirmar no aparelho.
-   - Com isso: `setLockTaskPackages` libera só o ASX, Waze, Google Maps, YouTube Music e o que mais for escolhido; `setLockTaskFeatures` decide se notificações, botão Início e Recentes aparecem; `setKeyguardDisabled` desliga a tela de bloqueio; o app pode se reabrir após atualização.
-   - Saída de emergência: um gesto escondido no app (ex.: segurar o título por 5 segundos e digitar um PIN) chama `stopLockTask()`. Remover o dono: `adb shell dpm remove-active-admin br.asx.manutencao/.Administrador`.
+**Detecção do carro (liga e desliga o modo):**
+- **Rotina da Samsung** ("Modos e rotinas", nativo da One UI, sem instalar nada): condição "Bluetooth conectado ao rádio do ASX" (ou ao adaptador OBD). Ações: abrir o ASX, Não perturbar com exceções, tempo de tela máximo, brilho alto. Ao desconectar, a rotina desfaz os ajustes sozinha. Há relatos de ajustes que não voltam (ex.: volume); conferir no tablet e, se preciso, adicionar ações de término.
+- **No próprio app**, como reforço: o modo carro liga quando o adaptador OBD aparece (`CompanionDeviceManager`), quando o áudio do carro conecta, ou por um botão manual; desliga quando os dois somem por alguns minutos, ou pelo botão.
 
-Recomendação: começar com 1, que resolve a maior parte sem reset; aplicar 3 quando o uso no carro estiver estável.
+**Dentro do modo carro:**
+- Layout automotivo (seção 4), paisagem, barras do sistema escondidas (gesto de borda para mostrá-las), tela sempre acesa.
+- Voltar não fecha o app; sair é uma ação explícita ("Sair do modo carro").
+- Botão Início e Recentes continuam funcionando: fixar o app (lock task) bloquearia o Waze em tela dividida. Contra saída acidental, um **botão flutuante "Voltar à central"** aparece por cima de outros apps enquanto o modo carro está ligado e a central não está visível (permissão "Sobrepor a outros apps", pedida uma vez).
+- O serviço do OBD só roda no modo carro; em casa não há serviço consumindo bateria.
+
+**Fora do modo carro:** o ASX é um app comum no tablet, com o layout atual (manutenção, combustível, ficha), Voltar normal e nenhuma sobreposição.
+
+**Configurações do Android que valem nos dois usos** e não atrapalham o tablet em casa: ASX, Waze e YouTube Music em "Apps nunca suspensos"; "Proteger bateria" (carga até 85%), recomendado pelo calor no painel. O bloqueio de tela pode continuar ativo em casa e ser dispensado pela rotina no carro ("Smart Lock" com o Bluetooth do carro como dispositivo confiável).
 
 ## 2. Conectividade automática
 
@@ -41,13 +46,14 @@ Princípio: o Android já reconecta Wi-Fi e áudio Bluetooth sozinho; o app **ob
   - O protocolo continua em JavaScript (`src/obd.js` já decodifica e é testado): o nativo só transporta texto pela ponte (`AsxNative.obd(comando)` → resposta), então nada do decodificador é reescrito.
   - Velocidade (PID 010D) e temperatura do motor viram dados do painel e alimentam o bloqueio de digitação em movimento (seção 4).
 - **Ordem de inicialização:** interface local (sem rede) → OBD → indicadores de rede e áudio. Nada bloqueia a tela esperando conexão.
+- Fora do carro nada disso roda: o tablet usa o Wi-Fi de casa e o Bluetooth normalmente.
 
 ## 3. Multitarefa: mapa e música sem o Android matar processos
 
 - **Cada app no seu processo, cada um protegido pelo próprio serviço.** O Waze (ou Google Maps) guia em primeiro plano com serviço de navegação; o YouTube Music toca com serviço de mídia; os dois são os últimos que o Android encerra. A central não tenta segurar esses processos: ela os **mostra** (tela dividida) e os **controla** (sessão de mídia, já pronto).
 - **Mapa: Waze ou Google Maps em tela dividida** com a central. Botão "Navegar" abre o app escolhido ao lado (`FLAG_ACTIVITY_LAUNCH_ADJACENT`); o card de manobra e a mídia continuam no lado da central. Isso dá trânsito ao vivo de graça e sem chave. O Google Navigation SDK e o mapa web do Google saem do APK (reduzem tamanho e memória, e o Demo Key não navega).
 - **A central também precisa sobreviver:**
-  - Como tela inicial e janela visível, ela já tem a maior prioridade.
+  - Como janela visível no modo carro, ela já tem a maior prioridade.
   - O `ObdService` em primeiro plano e o `NotificacoesService` (ligado pelo sistema) mantêm o processo vivo.
   - Se o processo de desenho da WebView morrer, `onRenderProcessGone` recria a WebView em vez de deixar a tela em branco.
 - **Ajustes da Samsung** (One UI suspende apps agressivamente): ASX, Waze e YouTube Music em "Apps nunca suspensos"; uso de bateria "Sem restrições" para os três; o app pede `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`. Com o tablet sempre na tomada e no sol, ligar **"Proteger bateria" (carga até 85%)** para reduzir calor e desgaste.
@@ -73,22 +79,23 @@ Referência: diretrizes de design do Google para telas de carro (alvo de toque m
 
 | Formato | Para central dedicada |
 |---|---|
-| PWA no navegador | Não serve: sem tela inicial, sem Bluetooth clássico, sem controlar mídia de outros apps, sem quiosque |
+| PWA no navegador | Não serve: sem Bluetooth clássico, sem controlar mídia de outros apps, sem detectar o carro |
 | **APK híbrido (casca nativa + interface web embutida)** | **Recomendado.** Reaproveita a interface e a lógica testada; o nativo cuida de tela inicial, quiosque, OBD, mídia, avisos e conectividade |
 | APK todo nativo (Jetpack Compose) | Melhor desempenho e acessibilidade, mas reescreve tudo; só compensa se a WebView mostrar limite real no tablet |
 | Android Automotive OS | Exige hardware de montadora; não roda num tablet comum |
 | Raspberry Pi com Hudiy/Crankshaft | Feito para receber projeção do celular, o oposto do objetivo |
 | ROM customizada no tablet | Trabalho e risco altos para ganho pequeno sobre o modo quiosque |
 
+O APK também é o único formato que permite o modo carro sem mexer no tablet: ele detecta o carro, controla a mídia e mostra o botão flutuante sem exigir reset nem trocar a tela inicial.
+
 Mudança central da arquitetura: **a interface web passa a ser embutida no APK** (copiada para `assets` no build e servida por `shouldInterceptRequest` sob uma origem HTTPS fixa). A central abre sem internet, a versão da interface acompanha a do APK (atualizada pelo botão "Procurar atualização", já pronto) e o repositório pode ficar privado. O site no GitHub Pages continua opcional para uso no celular.
 
 ## Ordem de execução proposta
 
-1. **Base de central:** interface embutida no APK; app como tela inicial; paisagem fixa e imersivo permanente; reabrir a WebView se o processo de desenho morrer; pedido de isenção de otimização de bateria; remover Navigation SDK e mapa web do Google.
-2. **OBD nativo:** `ObdService` com SPP e BLE, associação pelo `CompanionDeviceManager`, reconexão automática, ponte para o decodificador em JS.
+1. **Base de central:** interface embutida no APK; modo carro (detecção, liga e desliga, layout em paisagem com tela cheia, Voltar sem sair); reabrir a WebView se o processo de desenho morrer; pedido de isenção de otimização de bateria; remover Navigation SDK e mapa web do Google. Guia da rotina da Samsung no README.
+2. **OBD nativo:** `ObdService` com SPP e BLE, associação pelo `CompanionDeviceManager`, reconexão automática, ponte para o decodificador em JS; adaptador presente também liga o modo carro.
 3. **UX automotiva:** novos tamanhos (76 dp, 32/24 dp), contraste, Início como painel de direção, bloqueio de formulários em movimento.
-4. **Multitarefa:** botão "Navegar" abrindo Waze ou Google Maps ao lado; indicadores de rede, áudio e OBD; avisos resumidos em movimento.
-5. **Quiosque com Device Owner** (opcional, exige reset do tablet).
+4. **Multitarefa:** botão "Navegar" abrindo Waze ou Google Maps ao lado; indicadores de rede, áudio e OBD; avisos resumidos em movimento; botão flutuante "Voltar à central".
 
 Cada etapa é um pull request com testes, capturas em 1333×800 (S6 Lite em paisagem) e APK pelo CI.
 
@@ -96,6 +103,6 @@ Cada etapa é um pull request com testes, capturas em 1333×800 (S6 Lite em pais
 
 - WebView sem Web Bluetooth: https://lists.w3.org/Archives/Public/public-web-bluetooth-log/2021Aug/0019.html
 - Tamanhos para telas de carro: https://developers.google.com/cars/design/design-foundations/visual-principles e https://developers.google.com/cars/design/android-auto/design-system/sizing
-- Modo de tarefa bloqueada e dono do dispositivo: https://developer.android.com/work/dpc/dedicated-devices/lock-task-mode
+- Modo de tarefa bloqueada (avaliado e descartado): https://developer.android.com/work/dpc/dedicated-devices/lock-task-mode
 - Bluetooth em segundo plano e dispositivo complementar: https://developer.android.com/develop/connectivity/bluetooth/ble/background e https://developer.android.com/reference/android/companion/CompanionDeviceManager
 - Versões do S6 Lite: https://doc.samsungmobile.com/SM-P613/026508230329/eng.html e https://www.gsmarena.com/samsung_galaxy_tab_s6_lite_2020_wifi_model_android_13_one_ui_5_update-news-57288.php
