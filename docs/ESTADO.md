@@ -16,7 +16,7 @@ Web app (PWA) para acompanhar um Mitsubishi ASX 2017/2018 2.0 16V MIVEC 4x2 manu
 | OBD por Bluetooth LE | código pronto, **não testado em adaptador real** | Perfis GATT FFF0 e 18F0. Decodificador validado com respostas gravadas do OBDb. |
 | OBD pela central Hudiy | código pronto, validado só contra `tools/fake-hudiy.mjs` | Só PIDs padrão da ECU 7E0 (API não troca cabeçalho CAN). |
 | Player e manobra pela central Hudiy | idem | Mídia e navegação do Android Auto via API da central. |
-| Player do YouTube embutido | pronto, **a ser substituído** (ver pendências) | API de iframe; playlist colada pelo usuário. |
+| APK Android (`android/`) | código pronto, **compilado só no CI, não testado em aparelho** | WebView + sessão de mídia + notificações de navegação (Vela, Maps, Waze). Ponte `window.AsxNative` / `window.asxNativo`. |
 | Trânsito ao vivo do Google | pronto, **não testado com chave real** | Mapa JS com TrafficLayer; rota pela **Routes API** (TRAFFIC_AWARE, alternativas). Chave do usuário em `localStorage` (`asx.gmaps`). |
 | Navegação | entregue ao **Vela** pelo intent `geo:` | Botão "Navegar no Vela" com coordenadas do destino. |
 | Layouts | pronto | 390 retrato, 844×390 paisagem, 820 tablet, 1366 desktop, 1024×600 central. |
@@ -26,7 +26,9 @@ Web app (PWA) para acompanhar um Mitsubishi ASX 2017/2018 2.0 16V MIVEC 4x2 manu
 
 - **Sem framework e sem build**: o app cabe em módulos ES simples; qualquer servidor estático publica. Facilita rodar no web view da central.
 - **Dados no aparelho**: sem conta, sem servidor, sem custo. Backup manual em JSON.
-- **Android Auto**: não executa web apps; só nativos aprovados. Caminho adotado: central Hudiy (Linux, Raspberry Pi/x86) que roda apps HTML e expõe ELM327, mídia e navegação por API local. App nativo Kotlin fica como opção futura reaproveitando `src/signalset.js` e `src/obd.js`.
+- **Android Auto**: não executa web apps; só nativos aprovados em categorias fechadas. Dois caminhos adotados: central Hudiy (Linux) que roda apps HTML e expõe ELM327, mídia e navegação por API local; e o **APK fino** (`android/`), uma WebView do mesmo app com ponte nativa para sessão de mídia e notificações de navegação, pensado para celular no suporte e para centrais Android (instalar e definir como tela inicial).
+- **APK sem Capacitor e sem AndroidX**: só WebView, `addJavascriptInterface`, `MediaSessionManager` e `NotificationListenerService`; compila no GitHub Actions (`.github/workflows/android.yml`), sem Android Studio.
+- **YouTube Music**: o web app não consegue controlar outros apps; o player embutido do YouTube foi removido quando o APK assumiu esse papel.
 - **Waze removido**: sem API de rota; o usuário escolheu Vela como navegador. O mapa ao vivo do Waze foi substituído pelo Google com trânsito.
 - **Vela (github.com/PimpinPumpkin/Vela)**: app nativo Android, GPL-3; não embute em web. Registra `geo:`, `google.navigation:` e é app de navegação do Android Auto. Seu trânsito vem de endpoint não oficial do Google; **não replicar** isso aqui (CORS impede em web, viola termos, quebra sem aviso).
 - **Google Maps**: Directions API (legada) não pode ser ativada em projetos novos desde outubro de 2026; por isso a rota usa a Routes API. Cotas grátis mensais: 10 mil cargas de mapa, 5 mil rotas com trânsito. Exige conta de faturamento com cartão. Termos proíbem guiar curva a curva no app; por isso a condução vai para o Vela.
@@ -35,7 +37,7 @@ Web app (PWA) para acompanhar um Mitsubishi ASX 2017/2018 2.0 16V MIVEC 4x2 manu
 
 ## Pendências (em ordem)
 
-1. **Controle do YouTube Music do celular pelo rodapé**: o usuário quer que o web app apenas controle e exiba o que o app do YouTube Music está tocando. Web não consegue (sem API). Proposta aguardando confirmação: app companheiro Android mínimo (`companion-android/`, Kotlin, NotificationListenerService + MediaSessionManager + WebSocket em localhost com token; APK gerado por GitHub Actions). Ao confirmar: remover o player embutido do YouTube (`src/media.js`, parte de `renderPlayer` em `src/app.js`, estilos `.ytwrap`) e reaproveitar o modo "hudiy" da barra para o modo "celular".
+1. **Testar o APK em aparelho real**: instalar, dar acesso a notificações, tocar no YouTube Music, navegar no Vela; conferir formato da notificação do Vela (título/texto/ícone) e ajustar `NotificacoesService.processar` se vier diferente do Maps/Waze. Ver também ícone invertido no card (`.navcard img { filter: invert(1) }` foi pensado para ícones brancos do Android Auto).
 2. **Testes em hardware real**: adaptador ELM327 BLE no carro; chave do Google no celular; central Hudiy.
 3. **Histórico do git**: dois commits do `main` carregam o e-mail pessoal do autor (commit inicial e merge do PR 1). Remover exige reescrever o histórico com force-push em `main`; só com autorização explícita do dono. Alternativa: ativar "Keep my email addresses private" no GitHub para commits futuros.
 4. **Tablet retrato (820 px)**: card do carro fica estreito e rótulos de motor e elétrica se aproximam. Cosmético.
@@ -50,10 +52,11 @@ node tools/screens.cjs shots  # capturas em 390/820/1366 (precisa de playwright 
 node tools/fake-hudiy.mjs assets/icon-512.png   # API Hudiy falsa em ws://localhost:44406 (precisa de ws)
 node tools/hudiy-screens.cjs shots              # app conectado à central falsa
 node tools/mapa-falso.cjs shots                 # fluxo do mapa com google.maps e Routes API simulados
+node tools/celular-falso.cjs shots              # rodapé e card de manobra com a ponte nativa simulada
 ```
 
 Os scripts em `tools/` usam Playwright com Chromium; em ambiente sem GPU, as flags de software já estão nos scripts.
 
 ## Chaves e dados que nunca entram no repositório
 
-Chave do Google Maps, backups `asx-backup-*.json`, posição salva, links de playlist, o PDF do manual do proprietário (direitos da Mitsubishi) e qualquer dado pessoal do dono.
+Chave do Google Maps, backups `asx-backup-*.json`, posição salva, keystore do APK, o PDF do manual do proprietário (direitos da Mitsubishi) e qualquer dado pessoal do dono.

@@ -25,13 +25,13 @@ src/car.js          modelo 3D (model-viewer) e silhueta SVG com pontos por área
 src/obd.js          decodificador OBDb v3, ISO-TP, DTCs, transportes (Bluetooth LE, Hudiy, simulador)
 src/signalset.js    sinais no formato OBDb (CC-BY-SA-4.0)
 src/hudiy.js        cliente da API da central Hudiy (protobuf mínimo à mão)
-src/media.js        links do YouTube
 src/mapa.js         Google Maps JS (trânsito) + Routes API + links para o Vela
 sw.js               cache offline (bump de CACHE a cada mudança no shell)
 tests/              node --test
 tools/              servidor Hudiy falso, capturas de tela, mapa falso
 hudiy/              configs de exemplo para registrar o app na central
-.github/workflows   Pages (testa e publica)
+android/            APK fino em Kotlin (WebView + ponte nativa); compila só no CI
+.github/workflows   Pages (testa e publica) e Android (gera o APK)
 ```
 
 ## Convenções de UI
