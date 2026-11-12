@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ASX</string>
+    <!-- Endereço do web app publicado. Trocar aqui se mudar o domínio. -->
+    <string name="app_url" translatable="false">https://leocoradi.github.io/asx-manutencao/</string>
+</resources>

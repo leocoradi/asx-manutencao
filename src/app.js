@@ -3,7 +3,6 @@ import { situacao, ordenar, consumo } from './plan.js';
 import { carro, carro3d, CARRO_3D } from './car.js';
 import { Elm327Ble, HudiyObd, Simulador, COMANDOS } from './obd.js';
 import { Hudiy, MSG, TECLA, mediaStatus, mediaMeta, navStatus, navDetalhes, navDistancia, imagemUrl } from './hudiy.js';
-import { alvoYoutube, youtubeMusicUrl } from './media.js';
 import { carregarGoogle, MapaTransito, linksNavegar } from './mapa.js';
 
 // --- Estado e persistência (localStorage + backup JSON) ---
@@ -67,7 +66,7 @@ function inicio() {
   <div class="grid">
     ${nav.ativo ? `<section class="card navcard span-2" style="grid-column:1/-1" aria-live="polite">
       ${nav.iconeUrl ? `<img src="${nav.iconeUrl}" alt="">` : ''}
-      <div class="stack" style="flex:1"><div class="num dist">${esc(nav.distancia || '')}</div><div class="desc">${esc(nav.descricao || 'Navegando')}</div><small class="muted">Navegação via central (Android Auto)</small></div>
+      <div class="stack" style="flex:1"><div class="num dist">${esc(nav.distancia || '')}</div><div class="desc">${esc(nav.descricao || 'Navegando')}</div><small class="muted">${esc(nav.fonte || 'Navegação')}</small></div>
     </section>` : ''}
     <section class="card dark full mapa-card">
       <div class="row"><h2 style="margin:0">Trânsito</h2><button class="btn-ghost btn-sm" data-action="pos">${pos ? 'Atualizar posição' : 'Minha posição'}</button></div>
@@ -348,11 +347,6 @@ document.addEventListener('submit', (e) => {
   } else if (f.dataset.form === 'fuel') {
     S.fuel.push({ id: crypto.randomUUID(), data: d.data, km: d.km, litros: d.litros, valor: d.valor, cheio: d.cheio });
     atualizaOdo(d.km, d.data); toast('Abastecimento registrado.');
-  } else if (f.dataset.form === 'yt') {
-    const alvo = alvoYoutube(d.url);
-    if (!alvo) return toast('Link do YouTube não reconhecido.');
-    yt.alvo = alvo; localStorage.setItem('asx.yt', JSON.stringify(alvo)); yt.player?.destroy?.(); yt.player = null;
-    dlg.close(); renderPlayer(true); return;
   } else if (f.dataset.form === 'rota') {
     gm.destino = d.destino;
     if (!gm.mapa) { location.href = linksNavegar(d.destino).geo; return; }
@@ -386,9 +380,7 @@ document.addEventListener('click', (e) => {
   else if (a === 'gm-config') dlgConfig();
   else if (a === 'rota-alt') { gm.resumo = gm.mapa.escolher(+el.dataset.i); rotaAtualizar(); }
   else if (a === 'rota-limpar') { gm.mapa?.limpar(); gm.resumo = null; gm.destino = ''; rotaAtualizar(); }
-  else if (a === 'yt-config') dlgYoutube();
-  else if (a === 'yt-abrir') { document.querySelector('.ytwrap')?.classList.toggle('aberto'); }
-  else if (a === 'yt-remover') { yt.alvo = null; localStorage.removeItem('asx.yt'); yt.player?.destroy?.(); yt.player = null; dlg.close(); renderPlayer(true); }
+  else if (a === 'cel-acesso') window.AsxNative.pedirAcesso();
   else if (a === 'obd-ble') obdConectar(new Elm327Ble());
   else if (a === 'obd-hudiy') { conectarCentral(); obdConectar(new HudiyObd(central)); }
   else if (a === 'obd-sim') obdConectar(new Simulador());
@@ -421,12 +413,12 @@ main.addEventListener('keydown', (e) => { const h = e.target.closest('.hot'); if
 // --- Central Hudiy: player no rodapé e manobra do Android Auto no Início ---
 const central = new Hudiy();
 const midia = { titulo: '', artista: '', posicao: '', duracao: '', tocando: false, capaUrl: null };
-const nav = { ativo: false, descricao: '', distancia: '', iconeUrl: null };
+const nav = { ativo: false, descricao: '', distancia: '', iconeUrl: null, fonte: '' };
 const trocarUrl = (obj, chave, bytes) => { if (obj[chave]) URL.revokeObjectURL(obj[chave]); obj[chave] = imagemUrl(bytes); };
 central
   .on(MSG.MEDIA_STATUS, (p) => { Object.assign(midia, mediaStatus(p)); renderPlayer(); })
   .on(MSG.MEDIA_META, (p) => { const m = mediaMeta(p); trocarUrl(midia, 'capaUrl', m.capa); Object.assign(midia, m, { capa: undefined }); renderPlayer(); })
-  .on(MSG.NAV_STATUS, (p) => { const antes = nav.ativo; nav.ativo = navStatus(p).ativo; if (antes !== nav.ativo) render(); })
+  .on(MSG.NAV_STATUS, (p) => { const antes = nav.ativo; nav.ativo = navStatus(p).ativo; nav.fonte = 'Navegação via central (Android Auto)'; if (antes !== nav.ativo) render(); })
   .on(MSG.NAV_DETALHES, (p) => { const d = navDetalhes(p); trocarUrl(nav, 'iconeUrl', d.icone); nav.descricao = d.descricao; renderNav(); })
   .on(MSG.NAV_DIST, (p) => { nav.distancia = navDistancia(p); renderNav(); })
   .on('fechou', () => { midia.titulo = ''; nav.ativo = false; renderPlayer(); render(); });
@@ -482,52 +474,29 @@ function rotaAtualizar() { const el = main.querySelector('.rota-info'); if (el) 
 // Atualiza a posição sem perguntar quando a permissão já foi dada.
 navigator.permissions?.query({ name: 'geolocation' }).then((p) => { if (p.state === 'granted') localizar(false); }).catch(() => {});
 
-// --- Player do YouTube (API oficial de iframe) no rodapé ---
-const yt = { alvo: (() => { try { return JSON.parse(localStorage.getItem('asx.yt')); } catch { return null; } })(), player: null, titulo: '', autor: '', tocando: false, api: null };
-function ytApi() {
-  return (yt.api ??= new Promise((res) => {
-    if (window.YT?.Player) return res(window.YT);
-    window.onYouTubeIframeAPIReady = () => res(window.YT);
-    document.head.append(Object.assign(document.createElement('script'), { src: 'https://www.youtube.com/iframe_api' }));
-  }));
+// --- Celular (APK): sessão de mídia do aparelho e manobra do app de navegação pela ponte nativa ---
+const cel = { acesso: false, midia: null };
+const mmss = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+function celAplicar(e) {
+  cel.acesso = !!e.acesso; cel.midia = e.midia || null;
+  const antes = nav.ativo;
+  if (e.nav) Object.assign(nav, { ativo: true, distancia: e.nav.titulo, descricao: e.nav.texto, iconeUrl: e.nav.icone, fonte: `${e.nav.app}${e.nav.sub ? ' · ' + e.nav.sub : ''}` });
+  else if (nav.fonte && !nav.fonte.startsWith('Navegação via central')) nav.ativo = false;
+  renderPlayer(true);
+  if (antes !== nav.ativo) render(); else renderNav();
 }
-function ytMontar() {
-  const alvo = yt.alvo; if (!alvo || !document.getElementById('yt')) return;
-  ytApi().then((YT) => {
-    if (!document.getElementById('yt')) return;
-    yt.player = new YT.Player('yt', {
-      width: '100%', height: '100%', videoId: alvo.video,
-      playerVars: { playsinline: 1, rel: 0, ...(alvo.list ? { listType: 'playlist', list: alvo.list } : {}) },
-      events: {
-        onReady: () => ytAtualizar(),
-        onStateChange: (e) => { yt.tocando = e.data === 1; ytAtualizar(); },
-        onError: () => toast('O YouTube não conseguiu tocar este item.'),
-      },
-    });
-  });
-}
-function ytAtualizar() {
-  const d = yt.player?.getVideoData?.() || {};
-  yt.titulo = d.title || ''; yt.autor = d.author || '';
-  const el = document.getElementById('player');
-  const t = el.querySelector('.t'); if (t) t.textContent = yt.titulo || 'YouTube';
-  const a = el.querySelector('.d'); if (a) a.textContent = yt.autor || (yt.alvo?.list ? 'Playlist' : '');
-  const b = el.querySelector('.play'); if (b) { b.textContent = yt.tocando ? '⏸' : '▶'; b.setAttribute('aria-label', yt.tocando ? 'Pausar' : 'Tocar'); }
-}
-function dlgYoutube() {
-  abrir(`<h2>YouTube Music</h2>
-  <p>Cole o link de uma playlist ou música do YouTube Music (ou YouTube). Playlists privadas não tocam fora do app do YouTube; use pública ou não listada.</p>
-  <form data-form="yt">
-    <label>Link<input name="url" inputmode="url" placeholder="https://music.youtube.com/playlist?list=…" required value="${yt.alvo ? esc(yt.alvo.list ? `https://music.youtube.com/playlist?list=${yt.alvo.list}` : `https://music.youtube.com/watch?v=${yt.alvo.video}`) : ''}"></label>
-    <div class="actions"><button type="submit">Salvar</button>${yt.alvo ? '<button type="button" class="btn-ghost" data-action="yt-remover">Remover</button>' : ''}<button type="button" class="btn-ghost" data-action="fechar">Cancelar</button></div>
-  </form>
-  <p class="muted"><small>Com a tela desligada o YouTube pausa a reprodução em navegadores; é regra da plataforma, não do app.</small></p>`);
-}
+window.asxNativo = { evento: (json) => { try { celAplicar(typeof json === 'string' ? JSON.parse(json) : json); } catch (err) { console.error(err); } } };
+function celSincronizar() { if (window.AsxNative) { try { celAplicar(JSON.parse(window.AsxNative.estado())); } catch {} } }
+document.addEventListener('visibilitychange', () => { if (!document.hidden) celSincronizar(); });
+setInterval(() => { // posição corrente enquanto toca, sem esperar evento do Android
+  const m = cel.midia; const d = document.querySelector('#player .d[data-pos]');
+  if (m && m.tocando && d) d.textContent = `${m.artista} · ${mmss(m.posicao + Date.now() - m.instante)} / ${mmss(m.duracao)}`;
+}, 1000);
+
 let playerModo = '';
-function renderPlayer(forcar) {
+function renderPlayer() {
   const el = document.getElementById('player');
-  const modo = central.conectado && midia.titulo ? 'hudiy' : yt.alvo ? 'yt' : 'atalhos';
-  if (modo === 'yt' && playerModo === 'yt' && !forcar) return ytAtualizar();
+  const modo = central.conectado && midia.titulo ? 'hudiy' : window.AsxNative ? 'celular' : 'nenhum';
   playerModo = modo;
   if (modo === 'hudiy') {
     el.innerHTML = `<div class="barra">
@@ -538,33 +507,28 @@ function renderPlayer(forcar) {
         <button class="play" data-tecla="${TECLA.TOGGLE_PLAY}" aria-label="${midia.tocando ? 'Pausar' : 'Tocar'}">${midia.tocando ? '⏸' : '▶'}</button>
         <button data-tecla="${TECLA.PROXIMA}" aria-label="Próxima faixa">⏭</button>
       </div></div>`;
-  } else if (modo === 'yt') {
-    el.innerHTML = `<div class="ytwrap"><div id="yt"></div></div>
-      <div class="barra">
-        <button class="capa" data-action="yt-abrir" aria-label="Mostrar ou esconder o vídeo"><i></i></button>
-        <div class="info"><div class="t">YouTube</div><div class="d">${yt.alvo.list ? 'Playlist' : ''}</div></div>
-        <div class="ctl">
-          <button data-yt="anterior" aria-label="Faixa anterior">⏮</button>
-          <button class="play" data-yt="toggle" aria-label="Tocar">▶</button>
-          <button data-yt="proxima" aria-label="Próxima faixa">⏭</button>
-          <button data-action="yt-config" aria-label="Trocar playlist">⋯</button>
-        </div></div>`;
-    ytMontar();
-  } else {
+  } else if (modo === 'celular' && !cel.acesso) {
+    el.innerHTML = `<div class="barra"><div class="info"><div class="t">Controle de mídia e manobras</div><div class="d">Permita o acesso a notificações para o app ler o YouTube Music e o navegador.</div></div>
+      <button class="btn-sm" style="background:var(--fg);color:var(--bg)" data-action="cel-acesso">Permitir</button></div>`;
+  } else if (modo === 'celular' && cel.midia) {
+    const m = cel.midia;
     el.innerHTML = `<div class="barra">
-      <button class="atalho" data-action="yt-config"><i></i>Tocar YouTube Music aqui</button>
-      <a class="atalho app" href="${youtubeMusicUrl}" target="_blank" rel="noopener">Abrir app</a></div>`;
-  }
+      ${m.capa ? `<img class="capa" src="${m.capa}" alt="">` : '<div class="capa"></div>'}
+      <div class="info"><div class="t">${esc(m.titulo)}</div><div class="d" data-pos>${esc(m.artista)}${m.duracao ? ` · ${mmss(m.posicao)} / ${mmss(m.duracao)}` : ''}</div></div>
+      <div class="ctl">
+        <button data-cel="prev" aria-label="Faixa anterior">⏮</button>
+        <button class="play" data-cel="toggle" aria-label="${m.tocando ? 'Pausar' : 'Tocar'}">${m.tocando ? '⏸' : '▶'}</button>
+        <button data-cel="next" aria-label="Próxima faixa">⏭</button>
+      </div></div>`;
+  } else if (modo === 'celular') {
+    el.innerHTML = `<div class="barra"><div class="info"><div class="t">Nada tocando</div><div class="d">Dê play no YouTube Music; a faixa e os controles aparecem aqui.</div></div>
+      <a class="atalho" href="https://music.youtube.com/" target="_blank" rel="noopener"><i></i>YouTube Music</a></div>`;
+  } else el.innerHTML = '';
 }
-document.getElementById('player').addEventListener('click', (e) => {
-  const y = e.target.closest('[data-yt]'); if (!y || !yt.player) return;
-  const acao = y.dataset.yt;
-  if (acao === 'anterior') yt.player.previousVideo();
-  else if (acao === 'proxima') yt.player.nextVideo();
-  else if (yt.tocando) yt.player.pauseVideo(); else yt.player.playVideo();
-});
+document.getElementById('player').addEventListener('click', (e) => { const b = e.target.closest('[data-cel]'); if (b && window.AsxNative) window.AsxNative.midia(b.dataset.cel); });
 document.getElementById('player').addEventListener('click', (e) => { const b = e.target.closest('[data-tecla]'); if (b) central.tecla(+b.dataset.tecla); });
 renderPlayer();
+celSincronizar();
 if (window.hudiy) conectarCentral();
 
 // --- Roteamento ---
