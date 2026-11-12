@@ -16,7 +16,7 @@ Web app (PWA) para acompanhar um Mitsubishi ASX 2017/2018 2.0 16V MIVEC 4x2 manu
 | OBD por Bluetooth LE | código pronto, **não testado em adaptador real** | Perfis GATT FFF0 e 18F0. Decodificador validado com respostas gravadas do OBDb. |
 | OBD pela central Hudiy | código pronto, validado só contra `tools/fake-hudiy.mjs` | Só PIDs padrão da ECU 7E0 (API não troca cabeçalho CAN). |
 | Player e manobra pela central Hudiy | idem | Mídia e navegação do Android Auto via API da central. |
-| APK Android (`android/`) | código pronto, **compilado só no CI, não testado em aparelho** | WebView + sessão de mídia + notificações de navegação (Vela, Maps, Waze). Ponte `window.AsxNative` / `window.asxNativo`. |
+| APK Android (`android/`) | **rodando em aparelho real**; defeitos de layout listados em `docs/PLANO.md` | WebView + sessão de mídia + notificações de navegação (Vela, Maps, Waze). Ponte `window.AsxNative` / `window.asxNativo`. |
 | Trânsito ao vivo do Google | pronto, **não testado com chave real** | Mapa JS com TrafficLayer; rota pela **Routes API** (TRAFFIC_AWARE, alternativas). Chave do usuário em `localStorage` (`asx.gmaps`). |
 | Navegação | entregue ao **Vela** pelo intent `geo:` | Botão "Navegar no Vela" com coordenadas do destino. |
 | Layouts | pronto | 390 retrato, 844×390 paisagem, 820 tablet, 1366 desktop, 1024×600 central. |
@@ -37,7 +37,7 @@ Web app (PWA) para acompanhar um Mitsubishi ASX 2017/2018 2.0 16V MIVEC 4x2 manu
 
 ## Pendências (em ordem)
 
-1. **Testar o APK em aparelho real**: instalar, dar acesso a notificações, tocar no YouTube Music, navegar no Vela; conferir formato da notificação do Vela (título/texto/ícone) e ajustar `NotificacoesService.processar` se vier diferente do Maps/Waze. Ver também ícone invertido no card (`.navcard img { filter: invert(1) }` foi pensado para ícones brancos do Android Auto).
+1. **Executar `docs/PLANO.md`**: o APK já rodou em aparelho real (mídia do YouTube Music e manobra do Google Maps apareceram). As capturas mostraram defeitos de insets e do card de manobra; o plano traz as correções, a reorganização em quatro abas, a tela de Navegação (mapa + mídia + avisos), a central de notificações, o web embutido no APK (para permitir repositório privado) e o protótipo do Google Navigation SDK. Vereditos registrados lá: Waze não embute; OpenAuto/Crankshaft não têm código reaproveitável.
 2. **Testes em hardware real**: adaptador ELM327 BLE no carro; chave do Google no celular; central Hudiy.
 3. **Histórico do git**: dois commits do `main` carregam o e-mail pessoal do autor (commit inicial e merge do PR 1). Remover exige reescrever o histórico com force-push em `main`; só com autorização explícita do dono. Alternativa: ativar "Keep my email addresses private" no GitHub para commits futuros.
 4. **Tablet retrato (820 px)**: card do carro fica estreito e rótulos de motor e elétrica se aproximam. Cosmético.

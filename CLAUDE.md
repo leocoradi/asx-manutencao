@@ -1,6 +1,6 @@
 # Guia para agentes neste repositório
 
-Leia também `docs/ESTADO.md` (o que existe, decisões, pendências) antes de mudar qualquer coisa.
+Leia também `docs/ESTADO.md` (o que existe, decisões, pendências) e `docs/PLANO.md` (roteiro da refatoração de abas, tela de Navegação e mapa) antes de mudar qualquer coisa.
 
 ## Regras do projeto
 
