@@ -1,0 +1,3 @@
+This work is based on "Mitsubishi ASX" (https://sketchfab.com/3d-models/mitsubishi-asx-79304f5b3fd342ad812cd584695ebbad) by mamont nikita (https://sketchfab.com/mamontnikita62) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+
+Modificações: carroceria e maçanetas pintadas de preto, malha simplificada (meshoptimizer) e compactada em GLB com meshopt via glTF Transform.

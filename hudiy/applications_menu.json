@@ -1,0 +1,12 @@
+{
+    "categories": [],
+    "items": [
+        {
+            "categories": [],
+            "iconFontFamily": "Material Symbols Outlined",
+            "iconName": "directions_car",
+            "label": "ASX",
+            "action": "asx_manutencao"
+        }
+    ]
+}
