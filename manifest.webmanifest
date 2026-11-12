@@ -1,0 +1,15 @@
+{
+  "name": "ASX Manutenção",
+  "short_name": "ASX",
+  "description": "Acompanhamento de manutenção, abastecimento e OBD do Mitsubishi ASX 2017/2018.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
