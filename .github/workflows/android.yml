@@ -20,7 +20,8 @@ jobs:
       # Assinatura estável (opcional): secrets ANDROID_KEYSTORE_B64, ANDROID_KEYSTORE_SENHA, ANDROID_CHAVE, ANDROID_CHAVE_SENHA.
       # Sem eles o APK sai com a chave de debug do runner e atualizar exige desinstalar.
       - name: Keystore
-        if: ${{ secrets.ANDROID_KEYSTORE_B64 != '' }}
+        env: { KS: '${{ secrets.ANDROID_KEYSTORE_B64 }}' }
+        if: env.KS != ''
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > "$RUNNER_TEMP/asx.jks"
           echo "ASX_KEYSTORE=$RUNNER_TEMP/asx.jks" >> "$GITHUB_ENV"
