@@ -107,7 +107,7 @@ function navegacao() {
   const nativo = navNativo();
   return `
   <div class="nav-view">
-    <section class="mapa-area">
+    <section class="mapa-area${nativo ? ' nativo' : ''}">
       <div class="manobra-slot" aria-live="polite">${manobraHtml()}</div>
       ${nativo ? '<div class="mapa-box nativo" id="mapa-nativo" role="region" aria-label="Mapa de navegação"></div>'
         : gm.chave ? '<div class="mapa-box gmapa" id="gmapa" role="region" aria-label="Mapa do Google com trânsito ao vivo"></div>'
@@ -519,13 +519,18 @@ function rotaHtml() {
   const a = r.rotas[r.atual];
   const l = linksNavegar(gm.destino, a.fim.lat, a.fim.lng);
   return `
-    <div class="row" style="margin-top:10px;align-items:flex-end">
-      <div><div class="num mid">${esc(a.tempo)}</div><small class="muted">${esc(a.distancia)} · via ${esc(a.via || '—')}${a.tempo !== a.tempoSemTransito ? ` · sem trânsito ${esc(a.tempoSemTransito)}` : ''}</small></div>
-      <div class="actions" style="margin:0"><a class="btn btn-sm" style="background:var(--fg);color:var(--bg);text-decoration:none;display:inline-flex;align-items:center" href="${l.geo}">Navegar no Vela</a><button class="btn-ghost btn-sm" data-action="rota-limpar">Limpar</button></div>
+    <div class="rota-resumo">
+      <div class="rr-texto"><b class="rr-tempo">${esc(a.tempo)}</b><small class="muted">${esc(a.distancia)}${a.via ? ` · via ${esc(a.via)}` : ''}${a.tempo !== a.tempoSemTransito ? ` · sem trânsito ${esc(a.tempoSemTransito)}` : ''}</small></div>
+      <a class="btn btn-sm claro rr-ir" href="${l.geo}">Navegar no Vela</a>
+      <button class="btn-ghost btn-sm" data-action="rota-limpar" aria-label="Limpar rota">✕</button>
     </div>
-    ${r.rotas.length > 1 ? `<div class="alts">${r.rotas.map((x) => `<button class="chip ${x.i === r.atual ? 'ok' : ''}" data-action="rota-alt" data-i="${x.i}" aria-pressed="${x.i === r.atual}">${esc(x.tempo)} · ${esc(x.via || x.distancia)}</button>`).join('')}</div>` : ''}
-    <details class="passos"><summary>${a.passos.length} manobras até ${esc(a.endereco)}</summary><ol>${a.passos.map((p) => `<li>${esc(p.texto)} <small class="muted">${esc(p.distancia)}</small></li>`).join('')}</ol></details>`;
+    ${r.rotas.length > 1 ? `<div class="alts" role="group" aria-label="Rotas alternativas">${r.rotas.map((x) => `<button class="alt" data-action="rota-alt" data-i="${x.i}" aria-pressed="${x.i === r.atual}">${esc(x.tempo)} · ${esc(x.via || x.distancia)}</button>`).join('')}</div>` : ''}
+    <details class="passos"><summary>${a.passos.length} ${a.passos.length === 1 ? 'manobra' : 'manobras'}${a.endereco ? ` até ${esc(a.endereco)}` : ''}</summary><ol>${a.passos.map((p) => `<li>${esc(p.texto)} <small class="muted">${esc(p.distancia)}</small></li>`).join('')}</ol></details>`;
 }
+window.addEventListener('gmaps-chave', (e) => {
+  gm.mapa = null; toast(e.detail);
+  const el = document.getElementById('gmapa'); if (el) el.innerHTML = `<p class="muted" style="padding:16px;margin:0">${esc(e.detail)}</p>`;
+});
 function rotaAtualizar() { const el = main.querySelector('.rota-info'); if (el) el.innerHTML = rotaHtml(); }
 // Atualiza a posição sem perguntar quando a permissão já foi dada.
 navigator.permissions?.query({ name: 'geolocation' }).then((p) => { if (p.state === 'granted') localizar(false); }).catch(() => {});
@@ -579,7 +584,7 @@ function renderPlayer() {
   const i = midiaInfo(), vazio = semMidiaHtml();
   document.getElementById('player').innerHTML = i
     ? `<div class="barra">${capaHtml(i)}<div class="info"><div class="t">${esc(i.titulo)}</div><div class="d" data-midia-tempo="artista">${esc(i.artista)}${i.tempo ? ` · ${esc(i.tempo)}` : ''}</div></div>${ctlHtml(i)}</div>`
-    : vazio ? `<div class="barra">${vazio}</div>` : '';
+    : vazio && !cel.acesso ? `<div class="barra">${vazio}</div>` : ''; // sem mídia, o rodapé some; só o pedido de permissão ocupa espaço
 }
 function widgetMidiaHtml() {
   const i = midiaInfo();

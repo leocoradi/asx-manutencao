@@ -24,7 +24,13 @@ export function carregarGoogle(chave) {
     s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(chave)}&v=weekly&loading=async&language=pt-BR&region=BR&callback=__gmapsPronto`;
     s.onerror = () => { carregando = null; rej(new Error('Não foi possível carregar o Google Maps. Confira a chave e a rede.')); };
     document.head.append(s);
-    window.gm_authFailure = () => { carregando = null; rej(new Error('Chave do Google Maps recusada. Confira a chave e as restrições de domínio.')); };
+    // O Google chama isto quando recusa a chave, inclusive depois de o mapa já ter carregado.
+    window.gm_authFailure = () => {
+      carregando = null;
+      const msg = 'O Google recusou a chave. Chaves novas podem levar alguns minutos para funcionar; confira também as APIs ativadas e a restrição de site.';
+      rej(new Error(msg));
+      window.dispatchEvent(new CustomEvent('gmaps-chave', { detail: msg }));
+    };
   }));
 }
 

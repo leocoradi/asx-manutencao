@@ -42,8 +42,9 @@ class MainActivity : Activity() {
         raiz.addView(web, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         setContentView(raiz)
 
-        // Android 15+ desenha o app atrás das barras do sistema; a WebView não recebe essas margens,
-        // então elas viram padding do contêiner (barras, recorte da tela e teclado).
+        // Android 15+ desenha o app atrás das barras do sistema: as margens (barras, recorte da tela e
+        // teclado) viram padding do contêiner e são consumidas, senão a WebView aplica as mesmas margens
+        // de novo via env(safe-area-inset-*) e aparecem faixas vazias duplicadas no topo e embaixo.
         raiz.setOnApplyWindowInsetsListener { v, i ->
             if (Build.VERSION.SDK_INT >= 30) {
                 val b = i.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout() or WindowInsets.Type.ime())
@@ -52,7 +53,7 @@ class MainActivity : Activity() {
                 @Suppress("DEPRECATION")
                 v.setPadding(i.systemWindowInsetLeft, i.systemWindowInsetTop, i.systemWindowInsetRight, i.systemWindowInsetBottom)
             }
-            i
+            if (Build.VERSION.SDK_INT >= 30) WindowInsets.CONSUMED else consumir(i)
         }
         aplicarBarras()
 
@@ -88,6 +89,9 @@ class MainActivity : Activity() {
         Estado.ouvinte = { json -> runOnUiThread { web.evaluateJavascript("window.asxNativo && window.asxNativo.evento($json)", null) } }
         if (savedInstanceState == null) web.loadUrl(base.toString()) else web.restoreState(savedInstanceState)
     }
+
+    @Suppress("DEPRECATION")
+    private fun consumir(i: WindowInsets): WindowInsets = i.consumeSystemWindowInsets()
 
     // Em paisagem (uso no carro) as barras do sistema ficam escondidas e voltam com um gesto.
     private fun aplicarBarras() {
