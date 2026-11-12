@@ -2,6 +2,7 @@ import { VEICULO, AREAS, PLANO, FLUIDOS, FICHA, PNEUS, LAMPADAS, FUSIVEIS } from
 import { situacao, ordenar, consumo } from './plan.js';
 import { carro, carro3d, CARRO_3D } from './car.js';
 import { Elm327Ble, HudiyObd, Simulador, COMANDOS } from './obd.js';
+import { Hudiy, MSG, TECLA, mediaStatus, mediaMeta, navStatus, navDetalhes, navDistancia, imagemUrl } from './hudiy.js';
 
 // --- Estado e persistência (localStorage + backup JSON) ---
 const KEY = 'asx.v1';
@@ -62,6 +63,10 @@ function inicio() {
   const vencidos = lista.filter((l) => l.status === 'vencido').length;
   return `
   <div class="grid">
+    ${nav.ativo ? `<section class="card navcard span-2" style="grid-column:1/-1" aria-live="polite">
+      ${nav.iconeUrl ? `<img src="${nav.iconeUrl}" alt="">` : ''}
+      <div class="stack" style="flex:1"><div class="num dist">${esc(nav.distancia || '')}</div><div class="desc">${esc(nav.descricao || 'Navegando')}</div><small class="muted">Navegação via central (Android Auto)</small></div>
+    </section>` : ''}
     <section class="card dark">
       <h2>Odômetro</h2>
       <div class="row">
@@ -349,7 +354,7 @@ document.addEventListener('click', (e) => {
     S[k] = S[k].filter((x) => x.id !== el.dataset.id); salvar(); render();
   }
   else if (a === 'obd-ble') obdConectar(new Elm327Ble());
-  else if (a === 'obd-hudiy') obdConectar(new HudiyObd());
+  else if (a === 'obd-hudiy') { conectarCentral(); obdConectar(new HudiyObd(central)); }
   else if (a === 'obd-sim') obdConectar(new Simulador());
   else if (a === 'obd-off') obdDesconectar();
   else if (a === 'obd-dtc') obd.tx.dtcs().then((d) => { obd.dtcs = d; logObd(`DTCs: ${d.join(', ') || 'nenhum'}`); render(); }).catch((err) => toast(err.message));
@@ -376,6 +381,47 @@ function montarCarro3d() {
   });
 }
 main.addEventListener('keydown', (e) => { const h = e.target.closest('.hot'); if (h && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); h.click(); } });
+
+// --- Central Hudiy: player no rodapé e manobra do Android Auto (Waze, Maps) no Início ---
+const central = new Hudiy();
+const midia = { titulo: '', artista: '', posicao: '', duracao: '', tocando: false, capaUrl: null };
+const nav = { ativo: false, descricao: '', distancia: '', iconeUrl: null };
+const trocarUrl = (obj, chave, bytes) => { if (obj[chave]) URL.revokeObjectURL(obj[chave]); obj[chave] = imagemUrl(bytes); };
+central
+  .on(MSG.MEDIA_STATUS, (p) => { Object.assign(midia, mediaStatus(p)); renderPlayer(); })
+  .on(MSG.MEDIA_META, (p) => { const m = mediaMeta(p); trocarUrl(midia, 'capaUrl', m.capa); Object.assign(midia, m, { capa: undefined }); renderPlayer(); })
+  .on(MSG.NAV_STATUS, (p) => { const antes = nav.ativo; nav.ativo = navStatus(p).ativo; if (antes !== nav.ativo) render(); })
+  .on(MSG.NAV_DETALHES, (p) => { const d = navDetalhes(p); trocarUrl(nav, 'iconeUrl', d.icone); nav.descricao = d.descricao; renderNav(); })
+  .on(MSG.NAV_DIST, (p) => { nav.distancia = navDistancia(p); renderNav(); })
+  .on('fechou', () => { midia.titulo = ''; nav.ativo = false; renderPlayer(); render(); });
+function conectarCentral() { return central.conectar().then(renderPlayer).catch((e) => { logObd(e.message); return null; }); }
+function renderNav() {
+  const el = main.querySelector('.navcard');
+  if (!el) { if (nav.ativo) render(); return; }
+  el.querySelector('.dist').textContent = nav.distancia || '';
+  el.querySelector('.desc').textContent = nav.descricao || 'Navegando';
+  const img = el.querySelector('img'); if (img && nav.iconeUrl) img.src = nav.iconeUrl;
+}
+function renderPlayer() {
+  const el = document.getElementById('player');
+  if (central.conectado && midia.titulo) {
+    el.innerHTML = `
+      ${midia.capaUrl ? `<img class="capa" src="${midia.capaUrl}" alt="">` : '<div class="capa"></div>'}
+      <div class="info"><div class="t">${esc(midia.titulo)}</div><div class="d">${esc(midia.artista)}${midia.posicao ? ` · ${esc(midia.posicao)} / ${esc(midia.duracao)}` : ''}</div></div>
+      <div class="ctl">
+        <button data-tecla="${TECLA.ANTERIOR}" aria-label="Faixa anterior">⏮</button>
+        <button class="play" data-tecla="${TECLA.TOGGLE_PLAY}" aria-label="${midia.tocando ? 'Pausar' : 'Tocar'}">${midia.tocando ? '⏸' : '▶'}</button>
+        <button data-tecla="${TECLA.PROXIMA}" aria-label="Próxima faixa">⏭</button>
+      </div>`;
+  } else if (window.hudiy) el.innerHTML = '';
+  else el.innerHTML = `
+      <a class="atalho" href="https://music.youtube.com/" target="_blank" rel="noopener"><i></i>YouTube Music</a>
+      <a class="atalho waze" href="https://waze.com/ul?navigate=yes" target="_blank" rel="noopener"><i></i>Waze</a>
+      <small class="muted" style="margin-left:auto">Player e manobras aparecem na central Hudiy</small>`;
+}
+document.getElementById('player').addEventListener('click', (e) => { const b = e.target.closest('[data-tecla]'); if (b) central.tecla(+b.dataset.tecla); });
+renderPlayer();
+if (window.hudiy) conectarCentral();
 
 // --- Roteamento ---
 const VIEWS = { inicio, manutencao, combustivel, ficha, obd: obdView };

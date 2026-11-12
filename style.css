@@ -22,7 +22,7 @@
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.4;
-  min-height: 100dvh; display: grid; grid-template-rows: auto 1fr auto; grid-template-areas: 'top' 'main' 'nav';
+  min-height: 100dvh; display: grid; grid-template-rows: auto 1fr auto auto; grid-template-areas: 'top' 'main' 'player' 'nav';
 }
 .skip { position: absolute; left: -999px; top: 8px; background: var(--card); color: var(--card-fg); padding: 8px 12px; border-radius: 8px; z-index: 10; }
 .skip:focus { left: 8px; }
@@ -41,7 +41,7 @@ small { font-size: 12px; }
 .brand .dot-title { font-size: 22px; }
 .brand .sub { font-size: 12px; color: var(--fg-dim); }
 
-.nav { grid-area: nav; display: flex; justify-content: space-around; background: var(--bg); border-top: 1px dashed var(--line); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); position: sticky; bottom: 0; z-index: 5; }
+.nav { grid-area: nav; display: flex; justify-content: space-around; align-items: center; background: var(--bg); border-top: 1px dashed var(--line); padding: 0 4px env(safe-area-inset-bottom); height: calc(var(--nav-h) + env(safe-area-inset-bottom)); position: sticky; bottom: 0; z-index: 5; }
 .nav a { display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--fg-dim); text-decoration: none; font-size: 11px; padding: 6px 10px; border-radius: 14px; min-width: 56px; }
 .nav a svg, .icon-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .nav a[aria-current] { color: var(--fg); background: var(--bg-2); }
@@ -108,6 +108,25 @@ dialog { border: 0; border-radius: var(--r); padding: 20px; width: min(520px, ca
 dialog::backdrop { background: rgba(0,0,0,.7); }
 dialog h2 { margin-top: 0; }
 
+/* Player (rodapé) e navegação */
+.player { grid-area: player; background: var(--bg); border-top: 1px dashed var(--line); padding: 8px var(--pad); display: flex; align-items: center; gap: 12px; min-height: 64px; min-width: 0; overflow: hidden; position: sticky; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom)); z-index: 4; }
+.player:empty { display: none; }
+.player .capa { width: 48px; height: 48px; border-radius: 10px; background: var(--bg-2); object-fit: cover; flex: none; border: 1px dashed var(--line); }
+.player .info { flex: 1; min-width: 0; overflow: hidden; }
+.player .t, .player .d { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.player .t { font-weight: 600; }
+.player .d { font-size: 12px; color: var(--fg-dim); }
+.player .ctl { display: flex; gap: 4px; }
+.player .ctl button { background: transparent; color: var(--fg); min-width: 44px; min-height: 44px; padding: 0; border-radius: 50%; border: 1px dashed var(--line); font-size: 18px; line-height: 1; }
+.player .ctl button.play { background: var(--fg); color: var(--bg); border: 0; }
+.player .atalho { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; color: var(--fg); text-decoration: none; border: 1px dashed var(--line); border-radius: 999px; padding: 8px 14px; font-size: 14px; }
+.player .atalho i { width: 10px; height: 10px; border-radius: 50%; background: var(--red); display: inline-block; }
+.player .atalho.waze i { background: #33ccff; }
+.navcard { display: flex; align-items: center; gap: 16px; }
+.navcard img { width: 64px; height: 64px; object-fit: contain; filter: invert(1); flex: none; }
+.navcard .dist { font-size: 40px; line-height: 1; }
+.navcard .desc { font-size: 17px; }
+
 /* Modelo 3D */
 .car3d { width: 100%; height: auto; aspect-ratio: 3 / 2; max-height: 420px; background: transparent; --poster-color: transparent; display: block; }
 .poster { width: 100%; height: 100%; display: flex; align-items: center; }
@@ -141,13 +160,14 @@ dialog h2 { margin-top: 0; }
 .tile .u { font-size: 12px; color: var(--card-dim); margin-left: 4px; font-family: var(--sans); font-weight: 400; }
 .log { background: var(--bg-2); border: 1px dashed var(--line); border-radius: 12px; padding: 10px; font-family: ui-monospace, monospace; font-size: 12px; max-height: 160px; overflow: auto; white-space: pre-wrap; color: var(--fg-dim); }
 
-.toast { position: fixed; left: 50%; bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(20px); background: var(--card); color: var(--card-fg); padding: 10px 16px; border-radius: 999px; opacity: 0; transition: .2s; pointer-events: none; z-index: 20; max-width: calc(100vw - 32px); }
+.toast { position: fixed; left: 50%; top: calc(64px + env(safe-area-inset-top)); transform: translateX(-50%) translateY(-20px); background: var(--card); color: var(--card-fg); padding: 10px 16px; border-radius: 999px; opacity: 0; transition: .2s; pointer-events: none; z-index: 20; max-width: calc(100vw - 32px); }
 .toast.show { opacity: 1; transform: translateX(-50%); }
 .empty { padding: 24px; text-align: center; color: var(--card-dim); }
 
 /* Tablet: navegação lateral */
 @media (min-width: 768px) {
-  body { grid-template-columns: 96px 1fr; grid-template-rows: auto 1fr; grid-template-areas: 'nav top' 'nav main'; }
+  body { grid-template-columns: 96px 1fr; grid-template-rows: auto 1fr auto; grid-template-areas: 'nav top' 'nav main' 'nav player'; }
+  .player { bottom: 0; }
   .nav { flex-direction: column; justify-content: flex-start; gap: 6px; border-top: 0; border-right: 1px dashed var(--line); padding: 24px 8px; position: sticky; top: 0; height: 100dvh; }
   .nav a { padding: 10px 6px; }
   .main { padding: 8px 32px 40px; }
@@ -155,7 +175,6 @@ dialog h2 { margin-top: 0; }
   .grid { grid-template-columns: 1fr 1fr; }
   .tiles { grid-template-columns: repeat(3, 1fr); }
   .car3d { aspect-ratio: 16 / 8; }
-  .toast { bottom: 24px; }
 }
 /* Desktop */
 @media (min-width: 1100px) {

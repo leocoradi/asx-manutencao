@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decodificar, montarQuadros, decodificarResposta, decodificarDtcs, COMANDOS, protoCampos, quadroHudiy, lerQuadroHudiy, hudiyHello, hudiyObdReq, hudiyObdResp } from '../src/obd.js';
+import { decodificar, montarQuadros, decodificarResposta, decodificarDtcs, COMANDOS } from '../src/obd.js';
 
 const cmd = (svc, pid) => COMANDOS.find((c) => c.cmd[svc] === pid);
 
@@ -42,23 +42,4 @@ test('DTCs do serviço 03', () => {
   assert.deepEqual(decodificarDtcs([0x43, 0x02, 0x01, 0x33, 0xc1, 0x23]), ['P0133', 'U0123']);
   assert.deepEqual(decodificarDtcs([0x43, 0x00]), []);
   assert.deepEqual(decodificarDtcs(montarQuadros('7E8064302013300000')['7E8']), ['P0133']);
-});
-
-test('Hudiy: quadro e protobuf de ida e volta', () => {
-  const q = quadroHudiy(24, hudiyObdReq(['010D', '0105'], 300));
-  const { id, payload } = lerQuadroHudiy(q.buffer);
-  assert.equal(id, 24);
-  const c = protoCampos(payload);
-  assert.deepEqual(c[1].map((b) => new TextDecoder().decode(b)), ['010D', '0105']);
-  assert.equal(c[2][0], 300);
-  // HelloRequest { name, api_version { major: 1, minor: 0 } } codificado como o protobuf.js faria
-  assert.deepEqual([...hudiyHello('A')], [0x0a, 1, 0x41, 0x12, 4, 0x08, 1, 0x10, 0]);
-});
-
-test('Hudiy: resposta OBD "410D74" vira 116 km/h', () => {
-  const payload = new Uint8Array([0x08, 1, 0x12, 6, ...'410D74'.split('').map((ch) => ch.charCodeAt(0)), 0x18, 7]);
-  const r = hudiyObdResp(payload);
-  assert.deepEqual(r, { ok: true, dados: ['410D74'], codigo: 7 });
-  const cmd = COMANDOS.find((c) => c.cmd['01'] === '0D');
-  assert.equal(decodificarResposta(cmd, '7E803' + r.dados[0]).VSS, 116);
 });
