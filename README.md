@@ -4,14 +4,14 @@ Web app (PWA) para acompanhar o Mitsubishi ASX 2017/2018 2.0 16V MIVEC 4x2, câm
 
 ## O que tem
 
-- **Início**: odômetro, silhueta do carro com estado por área (motor, câmbio, freios, rodas, elétrica), próximas manutenções e consumo.
-- **Manutenção**: plano preventivo em uso severo (km ou meses, o que vencer primeiro) com especificações, part numbers e histórico de serviços.
+- **Início**: odômetro, carro 3D com estado por área (motor, câmbio, freios, rodas, elétrica), próximas manutenções, consumo e, com navegação ativa, uma faixa de manobra que leva à aba Navegação.
+- **Navegação**: mapa na área principal, widget de mídia e central de avisos. Em paisagem os widgets empilham à direita do mapa; em retrato, abaixo. O mapa é o **Google Navigation SDK** nativo no APK compilado com chave (guia curva a curva com voz, faixas e trânsito). Sem essa chave, ou no navegador, é o mapa web do Google com trânsito e rota pela Routes API, com o botão **Navegar no Vela**.
+- **Manutenção**, com três subseções: **Plano** (preventivo em uso severo, km ou meses, com especificações, part numbers e histórico), **Ficha** (motor, fluidos, pneus, lâmpadas, velas, fusíveis) e **OBD** (leitura ao vivo via ELM327 Bluetooth LE, códigos de falha, odômetro e contador de revisão do painel, com simulador).
 - **Combustível**: registro de abastecimentos, km/L por tanque cheio, média e custo por km.
-- **Ficha**: motor, fluidos e capacidades, pneus, lâmpadas, velas, fusíveis.
-- **OBD**: leitura ao vivo via ELM327 Bluetooth LE (Web Bluetooth), códigos de falha (serviço 03), odômetro e contador de revisão do painel. Há um simulador para ver a tela sem adaptador.
-- **Rodapé de mídia (no APK)**: mostra o que o celular está tocando (YouTube Music, Spotify…) com capa, faixa, artista, posição e anterior / play-pause / próxima. Lê a sessão de mídia do Android pelo app companheiro; no navegador o rodapé fica vazio.
-- **Trânsito no Início**: mapa do Google (API JavaScript oficial) com camada de trânsito ao vivo, sua posição e rota pela Routes API com tempo em trânsito agora, alternativas e lista de manobras. Precisa de uma chave de API sua (abaixo). O botão **Navegar no Vela** entrega o destino ao [Vela](https://github.com/PimpinPumpkin/Vela) pelo intent `geo:`. No APK, a manobra atual do Vela, Google Maps ou Waze aparece em um card no topo do Início, lida da notificação de navegação.
-- **Na central Hudiy**, o rodapé e o Início passam a usar o que a central recebe do Android Auto: faixa tocando com controles e a manobra atual (ícone, distância, instrução).
+- **Mídia (no APK)**: rodapé em todas as abas e widget na Navegação com o que o celular está tocando (YouTube Music, Spotify…): capa, faixa, artista, progresso e anterior / play-pause / próxima.
+- **Avisos (no APK)**: mensagens, chamadas e e-mail vindos das notificações do celular, com Ouvir (leitura em voz alta), abrir e Dispensar. Ficam só em memória.
+- **Manobra de outros navegadores (no APK)**: com Vela, Google Maps ou Waze guiando em segundo plano, a próxima manobra aparece em um card, lida da notificação.
+- **Na central Hudiy**, mídia e manobra vêm do que a central recebe do Android Auto.
 - **Backup**: ícone de engrenagem exporta e importa JSON. Os dados ficam no `localStorage` do aparelho.
 
 Base técnica em `src/data.js`, extraída do manual do proprietário e do manual do Copilito da ASX (intervalos de uso severo no Brasil).
@@ -41,14 +41,29 @@ No Android (Chrome): abrir a URL → menu → *Instalar app*.
 O APK é uma casca fina em Kotlin (`android/`): uma WebView com o app publicado mais o que o navegador não consegue fazer:
 
 - **Sessão de mídia**: lê o que está tocando no celular e manda os controles (`MediaSessionManager`).
-- **Manobra do navegador**: lê a notificação em andamento do Vela, Google Maps ou Waze (`NotificationListenerService`) e mostra no Início.
-- **Intents**: "Navegar no Vela" e links externos abrem os apps do Android; a geolocalização pede a permissão do sistema.
+- **Notificações**: manobra do Vela, Google Maps ou Waze e central de avisos (`NotificationListenerService`), só em memória.
+- **Mapa nativo**: `NavigationView` do Google Navigation SDK posicionada sobre a WebView, no retângulo do mapa da aba Navegação.
+- **Intents e sistema**: links externos abrem os apps do Android; barras do sistema viram margem e somem em paisagem; geolocalização pede a permissão do sistema.
 
-Instalação: baixe `asx-manutencao.apk` do artefato do workflow **Android** (aba Actions) ou da release de uma tag `v*`, instale (permitir fontes desconhecidas) e, no rodapé, toque em **Permitir** para dar "Acesso a notificações" ao app. Sem isso, mídia e manobras não aparecem.
+Instalação: baixe `asx-manutencao.apk`, instale (permitir fontes desconhecidas) e, no rodapé, toque em **Permitir** para dar "Acesso a notificações" ao app. Sem isso, mídia, manobras e avisos não aparecem.
 
-Numa central multimídia Android, instale o APK e defina como tela inicial. Para assinatura estável entre versões, cadastre os secrets `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_SENHA`, `ANDROID_CHAVE` e `ANDROID_CHAVE_SENHA` no repositório; sem eles o APK sai com a chave de debug do runner e atualizar exige desinstalar antes.
+Onde baixar: sem a chave do Google, no artefato do workflow **Android** (aba Actions). Com a chave, em **Releases**, no rascunho "APK com mapa nativo (privado)", visível só para quem tem acesso de escrita ao repositório. O APK com chave não vai para o artefato porque artefatos de repositório público podem ser baixados por qualquer conta do GitHub.
 
-## Chave do Google Maps (trânsito ao vivo)
+### Mapa nativo (Navigation SDK)
+
+1. No [Google Cloud](https://console.cloud.google.com), no mesmo projeto, ative a API **Navigation SDK**.
+2. Crie uma **segunda chave de API** só para o app Android, com restrição de API apenas ao Navigation SDK. A chave do mapa web é restrita por site e não serve aqui.
+3. Em *APIs e serviços → Navigation SDK → Cotas*, limite os pedidos por dia (30 por dia mantém o mês abaixo dos 1.000 destinos gratuitos). Crie também um alerta de orçamento.
+4. No GitHub: *Settings → Secrets and variables → Actions → New repository secret*, nome `MAPS_API_KEY`, valor a chave.
+5. Rode o workflow **Android**. O APK sai no rascunho de release.
+
+Uso: na aba Navegação, digite o destino e toque em **Ir**. Na primeira vez o Google mostra os termos de uso. O endereço vira coordenada pelo Geocoder do Android, sem custo; cada destino pedido conta 1 na cota do Navigation SDK.
+
+Assinatura: sem keystore próprio, cada build é assinado com uma chave de debug nova e atualizar exige desinstalar antes (os registros ficam no app; exporte o backup). Para assinatura estável e para poder restringir a chave do Google ao pacote `br.asx.manutencao`, cadastre os secrets `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_SENHA`, `ANDROID_CHAVE` e `ANDROID_CHAVE_SENHA`.
+
+Numa central multimídia Android, instale o APK e defina como tela inicial.
+
+## Chave do Google Maps para o mapa web
 
 1. Em [console.cloud.google.com](https://console.cloud.google.com) crie um projeto e ative **Maps JavaScript API** e **Routes API** (a antiga Directions API não pode mais ser ativada em projetos novos desde outubro de 2026). O Google exige conta de faturamento com cartão, mas o uso pessoal fica dentro da cota gratuita mensal: 10 mil carregamentos de mapa e 5 mil rotas com trânsito. Vale criar um alerta de orçamento de R$ 1 em *Faturamento → Orçamentos e alertas*.
 2. Em *APIs e serviços → Credenciais* crie uma **chave de API**. Em *Restrições de aplicativo* escolha "Sites" e adicione `https://leocoradi.github.io/*` (e `http://localhost:8080/*` para testar). Em *Restrições de API* marque só as duas APIs acima.
@@ -114,7 +129,8 @@ src/car.js          modelo 3D e silhueta SVG com pontos de atenção
 vendor/             model-viewer e decodificador meshopt
 assets/asx.glb      modelo 3D preto (CC-BY-4.0, ver asx-LICENSE.txt)
 src/obd.js          decodificador OBDb, ISO-TP, DTCs, ELM327 BLE, simulador
-src/mapa.js         mapa do Google com trânsito, rota pela Routes API com tempo real e entrega ao Vela
+src/mapa.js         mapa web do Google com trânsito, rota pela Routes API e entrega ao Vela
+src/painel.js       rotas das abas e leitura da manobra a partir da notificação
 src/hudiy.js        cliente da API da central Hudiy (protobuf mínimo, mídia, navegação, OBD, teclas)
 src/signalset.js    sinais no formato OBDb v3
 sw.js               cache offline

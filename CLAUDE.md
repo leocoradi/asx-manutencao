@@ -1,6 +1,6 @@
 # Guia para agentes neste repositório
 
-Leia também `docs/ESTADO.md` (o que existe, decisões, pendências) antes de mudar qualquer coisa.
+Leia também `docs/ESTADO.md` (o que existe, decisões, pendências) e `docs/PLANO.md` (roteiro da refatoração de abas, tela de Navegação e mapa) antes de mudar qualquer coisa.
 
 ## Regras do projeto
 
@@ -18,7 +18,8 @@ Leia também `docs/ESTADO.md` (o que existe, decisões, pendências) antes de mu
 ```
 index.html          app shell, navegação, rodapé do player
 style.css           tema (Nothing UI: preto, cartões brancos, fonte Doto, tracejados, vermelho só em alerta) e breakpoints
-src/app.js          estado, rotas (#/inicio, #/manutencao, #/combustivel, #/ficha, #/obd), telas, formulários, backup, player, mapa, Hudiy
+src/app.js          estado, telas (Início, Navegação, Manutenção com Plano/Ficha/OBD, Combustível), formulários, backup, mídia, avisos, mapa, Hudiy
+src/painel.js       lógica pura: rotas das abas, manobra a partir da notificação, formatação
 src/data.js         base técnica do veículo e plano de manutenção (uso severo)
 src/plan.js         vencimento (km/tempo, estimativa pelo odômetro) e consumo
 src/car.js          modelo 3D (model-viewer) e silhueta SVG com pontos por área
@@ -28,9 +29,9 @@ src/hudiy.js        cliente da API da central Hudiy (protobuf mínimo à mão)
 src/mapa.js         Google Maps JS (trânsito) + Routes API + links para o Vela
 sw.js               cache offline (bump de CACHE a cada mudança no shell)
 tests/              node --test
-tools/              servidor Hudiy falso, capturas de tela, mapa falso
+tools/              servidor Hudiy falso, ponte nativa falsa, capturas de tela, mapa falso
 hudiy/              configs de exemplo para registrar o app na central
-android/            APK fino em Kotlin (WebView + ponte nativa); compila só no CI
+android/            APK em Kotlin (WebView + ponte nativa + Navigation SDK); compila só no CI
 .github/workflows   Pages (testa e publica) e Android (gera o APK)
 ```
 

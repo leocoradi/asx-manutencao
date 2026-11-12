@@ -82,7 +82,7 @@ export class MapaTransito {
     const centro = { lat: pos.lat, lng: pos.lon ?? pos.lng };
     this.#marcador ??= new this.#g.Circle({ map: this.#mapa, radius: 25, fillColor: '#ffffff', fillOpacity: 1, strokeColor: '#0a0a0a', strokeWeight: 3, zIndex: 10 });
     this.#marcador.setCenter(centro);
-    if (!this.#rotas) this.#mapa.panTo(centro);
+    if (!this.#rotas) { this.#mapa.panTo(centro); if (this.#mapa.getZoom?.() < 10) this.#mapa.setZoom(14); }
   }
   async rota(pos, destino) {
     const rotas = await calcularRotas(this.#chave, pos, destino);

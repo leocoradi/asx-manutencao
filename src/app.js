@@ -4,6 +4,7 @@ import { carro, carro3d, CARRO_3D } from './car.js';
 import { Elm327Ble, HudiyObd, Simulador, COMANDOS } from './obd.js';
 import { Hudiy, MSG, TECLA, mediaStatus, mediaMeta, navStatus, navDetalhes, navDistancia, imagemUrl } from './hudiy.js';
 import { carregarGoogle, MapaTransito, linksNavegar } from './mapa.js';
+import { analisarHash, manobraDeNotificacao, mmss, tempoDistancia } from './painel.js';
 
 // --- Estado e persistência (localStorage + backup JSON) ---
 const KEY = 'asx.v1';
@@ -64,17 +65,7 @@ function inicio() {
   const vencidos = lista.filter((l) => l.status === 'vencido').length;
   return `
   <div class="grid">
-    ${nav.ativo ? `<section class="card navcard span-2" style="grid-column:1/-1" aria-live="polite">
-      ${nav.iconeUrl ? `<img src="${nav.iconeUrl}" alt="">` : ''}
-      <div class="stack" style="flex:1"><div class="num dist">${esc(nav.distancia || '')}</div><div class="desc">${esc(nav.descricao || 'Navegando')}</div><small class="muted">${esc(nav.fonte || 'Navegação')}</small></div>
-    </section>` : ''}
-    <section class="card dark full mapa-card">
-      <div class="row"><h2 style="margin:0">Trânsito</h2><button class="btn-ghost btn-sm" data-action="pos">${pos ? 'Atualizar posição' : 'Minha posição'}</button></div>
-      ${gm.chave ? '<div class="gmapa" id="gmapa" role="region" aria-label="Mapa do Google com trânsito ao vivo"></div>'
-                 : `<p class="muted" style="margin:8px 0">Mapa do Google com trânsito ao vivo e rota com tempo real. <button class="btn-ghost btn-sm" data-action="gm-config">Configurar chave do Google Maps</button></p>`}
-      <form data-form="rota" class="row" style="margin-top:10px;gap:8px"><input name="destino" placeholder="Para onde?" required aria-label="Destino" maxlength="200" value="${esc(gm.destino)}"><button class="btn-sm" type="submit" style="background:var(--fg);color:var(--bg)">${gm.chave ? 'Rota' : 'Navegar'}</button></form>
-      <div class="rota-info">${rotaHtml()}</div>
-    </section>
+    <div class="faixa-slot full" aria-live="polite">${faixaHtml()}</div>
     <section class="card dark">
       <h2>Odômetro</h2>
       <div class="row">
@@ -112,7 +103,35 @@ function inicio() {
   </div>`;
 }
 
-function manutencao(q) {
+function navegacao() {
+  const nativo = navNativo();
+  return `
+  <div class="nav-view">
+    <section class="mapa-area">
+      <div class="manobra-slot" aria-live="polite">${manobraHtml()}</div>
+      ${nativo ? '<div class="mapa-box nativo" id="mapa-nativo" role="region" aria-label="Mapa de navegação"></div>'
+        : gm.chave ? '<div class="mapa-box gmapa" id="gmapa" role="region" aria-label="Mapa do Google com trânsito ao vivo"></div>'
+        : '<div class="mapa-box vazio"><p class="muted" style="margin:0">Mapa do Google com trânsito ao vivo e rota com tempo real.</p><button class="btn-ghost btn-sm" data-action="gm-config">Configurar chave do Google Maps</button></div>'}
+      <form data-form="rota" class="row destino">
+        <input name="destino" placeholder="Para onde?" required aria-label="Destino" maxlength="200" value="${esc(gm.destino)}">
+        <button class="btn-sm claro" type="submit">${nativo ? 'Ir' : gm.chave ? 'Rota' : 'Navegar'}</button>
+        ${nativo ? '' : `<button class="btn-ghost btn-sm" type="button" data-action="pos" aria-label="${pos ? 'Atualizar minha posição' : 'Usar minha posição'}">◎</button>`}
+      </form>
+      <div class="rota-info">${nativo ? guiaHtml() : rotaHtml()}</div>
+    </section>
+    <section class="w-midia card dark" aria-label="Mídia"></section>
+    <section class="w-avisos card dark" aria-label="Avisos"></section>
+  </div>`;
+}
+
+function manutencao(q, sub) {
+  const abas = [['', 'Plano'], ['ficha', 'Ficha'], ['obd', 'OBD']];
+  return `
+  <nav class="segctl" aria-label="Seções de manutenção">${abas.map(([s, r]) => `<a href="#/manutencao${s ? '/' + s : ''}" ${s === sub ? 'aria-current="page"' : ''}>${r}</a>`).join('')}</nav>
+  ${sub === 'ficha' ? ficha() : sub === 'obd' ? obdView() : plano(q)}`;
+}
+
+function plano(q) {
   const area = q.get('area');
   const lista = ordenar(PLANO, S.log, S.odo.km).filter((l) => !area || l.item.area === area);
   const hist = [...S.log].sort((a, b) => b.km - a.km || b.data.localeCompare(a.data));
@@ -274,7 +293,7 @@ function obdDesconectar() {
 }
 
 // --- Diálogos ---
-function abrir(html) { dlg.innerHTML = html; dlg.showModal(); }
+function abrir(html) { dlg.innerHTML = html; dlg.showModal(); sincronizarMapaNativo(); }
 function dlgRegistrar(itemId) {
   abrir(`<h2>Registrar serviço</h2>
   <form data-form="log">
@@ -349,6 +368,7 @@ document.addEventListener('submit', (e) => {
     atualizaOdo(d.km, d.data); toast('Abastecimento registrado.');
   } else if (f.dataset.form === 'rota') {
     gm.destino = d.destino;
+    if (navNativo()) { window.AsxNative.navegar(d.destino); toast('Calculando rota…'); return; }
     if (!gm.mapa) { location.href = linksNavegar(d.destino).geo; return; }
     if (!pos) return toast('Toque em "Minha posição" primeiro.');
     gm.mapa.rota(pos, d.destino).then((r) => { gm.resumo = r; rotaAtualizar(); }).catch((e) => toast('Rota: ' + (e.message || e)));
@@ -381,6 +401,8 @@ document.addEventListener('click', (e) => {
   else if (a === 'rota-alt') { gm.resumo = gm.mapa.escolher(+el.dataset.i); rotaAtualizar(); }
   else if (a === 'rota-limpar') { gm.mapa?.limpar(); gm.resumo = null; gm.destino = ''; rotaAtualizar(); }
   else if (a === 'cel-acesso') window.AsxNative.pedirAcesso();
+  else if (a === 'guia-parar') window.AsxNative.pararGuia();
+  else if (a.startsWith('aviso-')) window.AsxNative.aviso(a.slice(6), el.dataset.chave);
   else if (a === 'obd-ble') obdConectar(new Elm327Ble());
   else if (a === 'obd-hudiy') { conectarCentral(); obdConectar(new HudiyObd(central)); }
   else if (a === 'obd-sim') obdConectar(new Simulador());
@@ -410,26 +432,60 @@ function montarCarro3d() {
 }
 main.addEventListener('keydown', (e) => { const h = e.target.closest('.hot'); if (h && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); h.click(); } });
 
-// --- Central Hudiy: player no rodapé e manobra do Android Auto no Início ---
+// --- Manobra em andamento: vem da central Hudiy (Android Auto) ou da notificação do navegador no celular ---
 const central = new Hudiy();
 const midia = { titulo: '', artista: '', posicao: '', duracao: '', tocando: false, capaUrl: null };
-const nav = { ativo: false, descricao: '', distancia: '', iconeUrl: null, fonte: '' };
+const nav = { ativo: false, descricao: '', distancia: '', iconeUrl: null, fonte: '', central: false, inverter: false };
 const trocarUrl = (obj, chave, bytes) => { if (obj[chave]) URL.revokeObjectURL(obj[chave]); obj[chave] = imagemUrl(bytes); };
 central
-  .on(MSG.MEDIA_STATUS, (p) => { Object.assign(midia, mediaStatus(p)); renderPlayer(); })
-  .on(MSG.MEDIA_META, (p) => { const m = mediaMeta(p); trocarUrl(midia, 'capaUrl', m.capa); Object.assign(midia, m, { capa: undefined }); renderPlayer(); })
-  .on(MSG.NAV_STATUS, (p) => { const antes = nav.ativo; nav.ativo = navStatus(p).ativo; nav.fonte = 'Navegação via central (Android Auto)'; if (antes !== nav.ativo) render(); })
-  .on(MSG.NAV_DETALHES, (p) => { const d = navDetalhes(p); trocarUrl(nav, 'iconeUrl', d.icone); nav.descricao = d.descricao; renderNav(); })
-  .on(MSG.NAV_DIST, (p) => { nav.distancia = navDistancia(p); renderNav(); })
-  .on('fechou', () => { midia.titulo = ''; nav.ativo = false; renderPlayer(); render(); });
-function conectarCentral() { return central.conectar().then(renderPlayer).catch((e) => { logObd(e.message); return null; }); }
-function renderNav() {
-  const el = main.querySelector('.navcard');
-  if (!el) { if (nav.ativo) render(); return; }
-  el.querySelector('.dist').textContent = nav.distancia || '';
-  el.querySelector('.desc').textContent = nav.descricao || 'Navegando';
-  const img = el.querySelector('img'); if (img && nav.iconeUrl) img.src = nav.iconeUrl;
+  .on(MSG.MEDIA_STATUS, (p) => { Object.assign(midia, mediaStatus(p)); renderPlayer(); renderWidgets(); })
+  .on(MSG.MEDIA_META, (p) => { const m = mediaMeta(p); trocarUrl(midia, 'capaUrl', m.capa); Object.assign(midia, m, { capa: undefined }); renderPlayer(); renderWidgets(); })
+  .on(MSG.NAV_STATUS, (p) => { Object.assign(nav, { ativo: navStatus(p).ativo, central: true, inverter: true, fonte: 'Navegação via central (Android Auto)' }); atualizarManobra(); })
+  .on(MSG.NAV_DETALHES, (p) => { const d = navDetalhes(p); trocarUrl(nav, 'iconeUrl', d.icone); nav.descricao = d.descricao; atualizarManobra(); })
+  .on(MSG.NAV_DIST, (p) => { nav.distancia = navDistancia(p); atualizarManobra(); })
+  .on('fechou', () => { midia.titulo = ''; if (nav.central) nav.ativo = false; renderPlayer(); renderWidgets(); atualizarManobra(); });
+function conectarCentral() { return central.conectar().then(() => { renderPlayer(); renderWidgets(); }).catch((e) => { logObd(e.message); return null; }); }
+
+function manobraHtml() {
+  if (!nav.ativo) return '';
+  return `<div class="card navcard">
+    ${nav.iconeUrl ? `<img class="${nav.inverter ? 'inv' : ''}" src="${nav.iconeUrl}" alt="">` : ''}
+    <div class="stack" style="flex:1;min-width:0">${nav.distancia ? `<div class="num dist">${esc(nav.distancia)}</div>` : ''}<div class="desc">${esc(nav.descricao || 'Navegando')}</div><small class="muted">${esc(nav.fonte || 'Navegação')}</small></div></div>`;
 }
+// Guia do Navigation SDK (APK com chave): estado resumido; o mapa nativo já mostra a manobra.
+function guiaHtml() {
+  const g = cel.guia;
+  if (!g?.ativo) return g?.erro ? `<small class="muted">${esc(g.erro)}</small>` : '';
+  return `<div class="row" style="gap:8px"><small class="muted" style="min-width:0">Para ${esc(g.destino)}${g.segundos ? ' · ' + tempoDistancia(g.segundos, g.metros) : ''}</small><button class="btn-ghost btn-sm" data-action="guia-parar">Parar</button></div>`;
+}
+// No Início: faixa compacta que leva à aba Navegação.
+function faixaHtml() {
+  const g = cel.guia;
+  if (g?.ativo) return `<a class="navlink" href="#/navegacao"><div class="card navcard"><div class="stack" style="flex:1;min-width:0"><div class="desc">Navegando para ${esc(g.destino)}</div><small class="muted">${g.segundos ? tempoDistancia(g.segundos, g.metros) : 'Calculando…'}</small></div></div></a>`;
+  return nav.ativo ? `<a class="navlink" href="#/navegacao">${manobraHtml()}</a>` : '';
+}
+function atualizarManobra() {
+  const s = main.querySelector('.manobra-slot'); if (s) s.innerHTML = manobraHtml();
+  const f = main.querySelector('.faixa-slot'); if (f) f.innerHTML = faixaHtml();
+  const r = main.querySelector('.rota-info'); if (r && navNativo()) r.innerHTML = guiaHtml();
+  sincronizarMapaNativo();
+}
+// O ícone da notificação pode ser claro ou escuro conforme o tema do sistema; no cartão branco, o claro é invertido.
+function iconeClaro(url) {
+  return new Promise((res) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas'); c.width = c.height = 24;
+      const g = c.getContext('2d'); g.drawImage(img, 0, 0, 24, 24);
+      const d = g.getImageData(0, 0, 24, 24).data; let soma = 0, n = 0;
+      for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 128) { soma += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]; n++; }
+      res(n > 0 && soma / n > 150);
+    };
+    img.onerror = () => res(false);
+    img.src = url;
+  });
+}
+
 // --- Posição (mapa de trânsito) ---
 let pos = (() => { try { const p = JSON.parse(localStorage.getItem('asx.pos')); return Number.isFinite(p?.lat) && Number.isFinite(p?.lon) ? p : null; } catch { return null; } })();
 function localizar(pedido) {
@@ -437,7 +493,7 @@ function localizar(pedido) {
   navigator.geolocation.getCurrentPosition((g) => {
     pos = { lat: g.coords.latitude, lon: g.coords.longitude };
     localStorage.setItem('asx.pos', JSON.stringify(pos));
-    if (gm.mapa) gm.mapa.posicao(pos); else if (!main.querySelector('.mapa-card .gmapa')) { if (main.querySelector('.mapa-card')) render(); }
+    gm.mapa?.posicao(pos);
     vigiarPosicao();
   }, (e) => { if (pedido) toast(e.code === 1 ? 'Permissão de localização negada.' : 'Não foi possível obter a posição.'); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
 }
@@ -474,74 +530,120 @@ function rotaAtualizar() { const el = main.querySelector('.rota-info'); if (el) 
 // Atualiza a posição sem perguntar quando a permissão já foi dada.
 navigator.permissions?.query({ name: 'geolocation' }).then((p) => { if (p.state === 'granted') localizar(false); }).catch(() => {});
 
-// --- Celular (APK): sessão de mídia do aparelho e manobra do app de navegação pela ponte nativa ---
-const cel = { acesso: false, midia: null };
-const mmss = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+// --- Celular (APK): mídia, manobra, avisos e guia pela ponte nativa (window.AsxNative / window.asxNativo) ---
+const cel = { acesso: false, midia: null, guia: null, avisos: [] };
+const navNativo = () => { try { return !!window.AsxNative?.navSdk?.(); } catch { return false; } };
+let erroGuia = '';
 function celAplicar(e) {
-  cel.acesso = !!e.acesso; cel.midia = e.midia || null;
-  const antes = nav.ativo;
-  if (e.nav) Object.assign(nav, { ativo: true, distancia: e.nav.titulo, descricao: e.nav.texto, iconeUrl: e.nav.icone, fonte: `${e.nav.app}${e.nav.sub ? ' · ' + e.nav.sub : ''}` });
-  else if (nav.fonte && !nav.fonte.startsWith('Navegação via central')) nav.ativo = false;
-  renderPlayer(true);
-  if (antes !== nav.ativo) render(); else renderNav();
+  Object.assign(cel, { acesso: !!e.acesso, midia: e.midia || null, guia: e.guia || null, avisos: e.avisos || [] });
+  if (e.nav) {
+    const novoIcone = nav.iconeUrl !== e.nav.icone;
+    Object.assign(nav, manobraDeNotificacao(e.nav), { ativo: true, central: false, iconeUrl: e.nav.icone });
+    if (novoIcone) { nav.inverter = false; if (e.nav.icone) iconeClaro(e.nav.icone).then((c) => { nav.inverter = c; atualizarManobra(); }); }
+  } else if (!nav.central) nav.ativo = false;
+  if (cel.guia?.erro && cel.guia.erro !== erroGuia) toast(cel.guia.erro);
+  erroGuia = cel.guia?.erro || '';
+  renderPlayer(); renderWidgets(); atualizarManobra();
 }
 window.asxNativo = { evento: (json) => { try { celAplicar(typeof json === 'string' ? JSON.parse(json) : json); } catch (err) { console.error(err); } } };
 function celSincronizar() { if (window.AsxNative) { try { celAplicar(JSON.parse(window.AsxNative.estado())); } catch {} } }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) celSincronizar(); });
-setInterval(() => { // posição corrente enquanto toca, sem esperar evento do Android
-  const m = cel.midia; const d = document.querySelector('#player .d[data-pos]');
-  if (m && m.tocando && d) d.textContent = `${m.artista} · ${mmss(m.posicao + Date.now() - m.instante)} / ${mmss(m.duracao)}`;
-}, 1000);
 
-let playerModo = '';
-function renderPlayer() {
-  const el = document.getElementById('player');
-  const modo = central.conectado && midia.titulo ? 'hudiy' : window.AsxNative ? 'celular' : 'nenhum';
-  playerModo = modo;
-  if (modo === 'hudiy') {
-    el.innerHTML = `<div class="barra">
-      ${midia.capaUrl ? `<img class="capa" src="${midia.capaUrl}" alt="">` : '<div class="capa"></div>'}
-      <div class="info"><div class="t">${esc(midia.titulo)}</div><div class="d">${esc(midia.artista)}${midia.posicao ? ` · ${esc(midia.posicao)} / ${esc(midia.duracao)}` : ''}</div></div>
-      <div class="ctl">
-        <button data-tecla="${TECLA.ANTERIOR}" aria-label="Faixa anterior">⏮</button>
-        <button class="play" data-tecla="${TECLA.TOGGLE_PLAY}" aria-label="${midia.tocando ? 'Pausar' : 'Tocar'}">${midia.tocando ? '⏸' : '▶'}</button>
-        <button data-tecla="${TECLA.PROXIMA}" aria-label="Próxima faixa">⏭</button>
-      </div></div>`;
-  } else if (modo === 'celular' && !cel.acesso) {
-    el.innerHTML = `<div class="barra"><div class="info"><div class="t">Controle de mídia e manobras</div><div class="d">Permita o acesso a notificações para o app ler o YouTube Music e o navegador.</div></div>
-      <button class="btn-sm" style="background:var(--fg);color:var(--bg)" data-action="cel-acesso">Permitir</button></div>`;
-  } else if (modo === 'celular' && cel.midia) {
-    const m = cel.midia;
-    el.innerHTML = `<div class="barra">
-      ${m.capa ? `<img class="capa" src="${m.capa}" alt="">` : '<div class="capa"></div>'}
-      <div class="info"><div class="t">${esc(m.titulo)}</div><div class="d" data-pos>${esc(m.artista)}${m.duracao ? ` · ${mmss(m.posicao)} / ${mmss(m.duracao)}` : ''}</div></div>
-      <div class="ctl">
-        <button data-cel="prev" aria-label="Faixa anterior">⏮</button>
-        <button class="play" data-cel="toggle" aria-label="${m.tocando ? 'Pausar' : 'Tocar'}">${m.tocando ? '⏸' : '▶'}</button>
-        <button data-cel="next" aria-label="Próxima faixa">⏭</button>
-      </div></div>`;
-  } else if (modo === 'celular') {
-    el.innerHTML = `<div class="barra"><div class="info"><div class="t">Nada tocando</div><div class="d">Dê play no YouTube Music; a faixa e os controles aparecem aqui.</div></div>
-      <a class="atalho" href="https://music.youtube.com/" target="_blank" rel="noopener"><i></i>YouTube Music</a></div>`;
-  } else el.innerHTML = '';
+// --- Mídia: rodapé (todas as abas) e widget (aba Navegação), com a mesma fonte de dados ---
+const IC = {
+  prev: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg>',
+  next: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 5h2v14h-2zM4 5l11 7-11 7z"/></svg>',
+  play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l13 8-13 8z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>',
+};
+function midiaInfo() {
+  if (central.conectado && midia.titulo) return { titulo: midia.titulo, artista: midia.artista, capa: midia.capaUrl, tocando: midia.tocando, pct: null,
+    tempo: midia.posicao ? `${midia.posicao} / ${midia.duracao}` : '', attr: { prev: `data-tecla="${TECLA.ANTERIOR}"`, toggle: `data-tecla="${TECLA.TOGGLE_PLAY}"`, next: `data-tecla="${TECLA.PROXIMA}"` } };
+  const m = window.AsxNative && cel.midia;
+  if (!m) return null;
+  const p = Math.min(m.duracao || Infinity, m.posicao + (m.tocando ? Date.now() - m.instante : 0));
+  return { titulo: m.titulo, artista: m.artista, capa: m.capa, tocando: m.tocando, pct: m.duracao ? p / m.duracao : null,
+    tempo: m.duracao ? `${mmss(p)} / ${mmss(m.duracao)}` : '', attr: { prev: 'data-cel="prev"', toggle: 'data-cel="toggle"', next: 'data-cel="next"' } };
 }
-document.getElementById('player').addEventListener('click', (e) => { const b = e.target.closest('[data-cel]'); if (b && window.AsxNative) window.AsxNative.midia(b.dataset.cel); });
-document.getElementById('player').addEventListener('click', (e) => { const b = e.target.closest('[data-tecla]'); if (b) central.tecla(+b.dataset.tecla); });
-renderPlayer();
-celSincronizar();
-if (window.hudiy) conectarCentral();
+const ctlHtml = (i) => `<div class="ctl">
+  <button ${i.attr.prev} aria-label="Faixa anterior">${IC.prev}</button>
+  <button class="play" ${i.attr.toggle} aria-label="${i.tocando ? 'Pausar' : 'Tocar'}">${i.tocando ? IC.pause : IC.play}</button>
+  <button ${i.attr.next} aria-label="Próxima faixa">${IC.next}</button></div>`;
+const capaHtml = (i) => (i.capa ? `<img class="capa" src="${i.capa}" alt="">` : '<div class="capa"></div>');
+function semMidiaHtml() {
+  if (!window.AsxNative) return '';
+  return cel.acesso ? '<div class="info"><div class="t">Nada tocando</div><div class="d">Dê play no YouTube Music; a faixa aparece aqui.</div></div>'
+    : '<div class="info"><div class="t">Mídia, manobras e avisos</div><div class="d">Permita o acesso a notificações.</div></div><button class="btn-sm claro" data-action="cel-acesso">Permitir</button>';
+}
+function renderPlayer() {
+  const i = midiaInfo(), vazio = semMidiaHtml();
+  document.getElementById('player').innerHTML = i
+    ? `<div class="barra">${capaHtml(i)}<div class="info"><div class="t">${esc(i.titulo)}</div><div class="d" data-midia-tempo="artista">${esc(i.artista)}${i.tempo ? ` · ${esc(i.tempo)}` : ''}</div></div>${ctlHtml(i)}</div>`
+    : vazio ? `<div class="barra">${vazio}</div>` : '';
+}
+function widgetMidiaHtml() {
+  const i = midiaInfo();
+  if (!i) return `<div class="wm-vazio">${semMidiaHtml() || '<div class="info"><div class="t">Mídia</div><div class="d">O player do celular aparece aqui no app Android ou na central.</div></div>'}</div>`;
+  return `<div class="wm-topo">${capaHtml(i)}<div class="info"><div class="t">${esc(i.titulo)}</div><div class="d">${esc(i.artista)}</div></div></div>
+    <div class="wm-prog"><div class="wm-barra"><i data-midia-barra style="width:${(i.pct ?? 0) * 100}%"></i></div><small class="muted" data-midia-tempo="so">${esc(i.tempo)}</small></div>
+    ${ctlHtml(i)}`;
+}
+const hora = (ms) => new Date(ms).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+function widgetAvisosHtml() {
+  const l = cel.avisos || [];
+  if (!l.length) return `<h2>Avisos</h2><p class="muted" style="margin:0">${window.AsxNative ? (cel.acesso ? 'Sem avisos.' : 'Permita o acesso a notificações.') : 'Mensagens e chamadas aparecem aqui no app Android.'}</p>`;
+  return `<h2>Avisos</h2><ul class="avisos">${l.map((a) => `<li>
+    <button class="av-corpo" data-action="aviso-abrir" data-chave="${esc(a.chave)}"><small class="muted">${esc(a.app)} · ${hora(a.quando)}</small><span class="t">${esc(a.titulo)}</span><span class="tx">${esc(a.texto)}</span></button>
+    <div class="av-acoes"><button class="btn-ghost btn-sm" data-action="aviso-ouvir" data-chave="${esc(a.chave)}">Ouvir</button><button class="btn-ghost btn-sm" data-action="aviso-dispensar" data-chave="${esc(a.chave)}">Dispensar</button></div></li>`).join('')}</ul>`;
+}
+function renderWidgets() {
+  const m = main.querySelector('.w-midia'); if (m) m.innerHTML = widgetMidiaHtml();
+  const a = main.querySelector('.w-avisos'); if (a) a.innerHTML = widgetAvisosHtml();
+}
+setInterval(() => { // posição corrente enquanto toca, sem esperar evento do Android
+  const i = midiaInfo(); if (!i?.tocando || !i.tempo) return;
+  document.querySelectorAll('[data-midia-tempo]').forEach((d) => { d.textContent = d.dataset.midiaTempo === 'so' ? i.tempo : `${i.artista} · ${i.tempo}`; });
+  if (i.pct != null) document.querySelectorAll('[data-midia-barra]').forEach((b) => { b.style.width = `${i.pct * 100}%`; });
+}, 1000);
+document.addEventListener('click', (e) => {
+  const c = e.target.closest('[data-cel]'); if (c && window.AsxNative) return window.AsxNative.midia(c.dataset.cel);
+  const t = e.target.closest('[data-tecla]'); if (t) central.tecla(+t.dataset.tecla);
+});
+
+// --- Mapa nativo (Navigation SDK no APK): a view fica por cima da WebView, no retângulo de #mapa-nativo ---
+let mapaObs;
+function sincronizarMapaNativo() {
+  if (!window.AsxNative?.mapa) return;
+  const el = document.getElementById('mapa-nativo');
+  if (!el || dlg.open) return window.AsxNative.mapa(0, 0, 0, 0);
+  const r = el.getBoundingClientRect();
+  window.AsxNative.mapa(r.left, r.top, r.width, r.height);
+}
+dlg.addEventListener('close', sincronizarMapaNativo);
+window.addEventListener('resize', sincronizarMapaNativo);
 
 // --- Roteamento ---
-const VIEWS = { inicio, manutencao, combustivel, ficha, obd: obdView };
+const VIEWS = { inicio, navegacao, manutencao, combustivel };
 function render() {
-  const [path, qs] = location.hash.replace(/^#\/?/, '').split('?');
-  const view = VIEWS[path] ? path : 'inicio';
-  main.innerHTML = VIEWS[view](new URLSearchParams(qs));
-  document.querySelectorAll('.nav a').forEach((a) => a.toggleAttribute('aria-current', a.dataset.view === view));
-  if (view === 'inicio') { montarCarro3d(); montarMapa(); }
+  const r = analisarHash(location.hash);
+  if (r.redirecionar) return location.replace(r.redirecionar);
+  main.innerHTML = VIEWS[r.view](new URLSearchParams(r.qs), r.sub);
+  document.body.dataset.view = r.view;
+  document.querySelectorAll('.nav a').forEach((a) => a.toggleAttribute('aria-current', a.dataset.view === r.view));
+  mapaObs?.disconnect();
+  if (r.view === 'inicio') montarCarro3d();
+  if (r.view === 'navegacao') {
+    montarMapa(); renderWidgets();
+    const el = document.getElementById('mapa-nativo');
+    if (el) { mapaObs = new ResizeObserver(sincronizarMapaNativo); mapaObs.observe(el); }
+  }
+  sincronizarMapaNativo();
 }
 window.addEventListener('hashchange', () => { render(); main.focus({ preventScroll: true }); window.scrollTo(0, 0); });
+renderPlayer();
 render();
+celSincronizar();
+if (window.hudiy) conectarCentral();
 // Dentro da central Hudiy: tecla/gesto de voltar do web view.
 if (window.hudiy) window.hudiy.onGoBack = () => history.back();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

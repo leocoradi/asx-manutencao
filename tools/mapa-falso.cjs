@@ -22,7 +22,7 @@ const out = process.argv[2] || 'shots';
     { description: 'Av. 23 de Maio', duration: '1860s', staticDuration: '1080s', distanceMeters: 8400, polyline: { encodedPolyline: '_p~iF~ps|U_ulLnnqC' }, localizedValues: { distance: { text: '8,4 km' }, duration: { text: '31 min' }, staticDuration: { text: '18 min' } }, legs: leg([['Siga na Av. Paulista', '1,2 km'], ['Vire à direita na R. Vergueiro', '2,0 km'], ['Pegue a Av. 23 de Maio', '5,2 km']]) },
     { description: 'Av. dos Bandeirantes', duration: '2100s', staticDuration: '1320s', distanceMeters: 10100, polyline: { encodedPolyline: '_p~iF~ps|U_ulLnnqC' }, localizedValues: { distance: { text: '10,1 km' }, duration: { text: '35 min' }, staticDuration: { text: '22 min' } }, legs: leg([['Siga', '10 km']]) },
   ] }) }));
-  await p.goto('http://localhost:8080/');
+  await p.goto('http://localhost:8080/#/navegacao');
   await p.evaluate(() => { localStorage.setItem('asx.v1', JSON.stringify({ v: 1, odo: { km: 103250, data: '2026-11-10' }, log: [], fuel: [] })); localStorage.removeItem('asx.gmaps'); localStorage.removeItem('asx.pos'); });
   await p.reload(); await p.waitForTimeout(600);
   await p.screenshot({ path: `${out}/mapa-sem-chave.png`, clip: { x: 0, y: 90, width: 390, height: 330 } });

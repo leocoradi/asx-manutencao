@@ -1,0 +1,38 @@
+// Lógica pura do painel: rotas das abas e leitura da manobra a partir da notificação do app de navegação.
+
+const VIEWS = ['inicio', 'navegacao', 'manutencao', 'combustivel'];
+const SUBS = { manutencao: ['ficha', 'obd'] };
+const ANTIGAS = { ficha: 'manutencao/ficha', obd: 'manutencao/obd' };
+
+// "#/manutencao/obd?area=x" -> { view, sub, qs, redirecionar }. Rotas antigas (#/ficha, #/obd) apontam para a nova.
+export function analisarHash(hash) {
+  const [caminho, qs = ''] = String(hash || '').replace(/^#\/?/, '').split('?');
+  const [a = '', b = ''] = caminho.split('/');
+  if (ANTIGAS[a]) return { view: 'manutencao', sub: a, qs, redirecionar: `#/${ANTIGAS[a]}` };
+  const view = VIEWS.includes(a) ? a : 'inicio';
+  const sub = SUBS[view]?.includes(b) ? b : '';
+  return { view, sub, qs, redirecionar: null };
+}
+
+const DIST = /^\s*(\d+(?:[.,]\d+)?\s?(?:km|m|mi|ft))(?![\p{L}\d])\s*[·\-–—:]?\s*(.*)$/iu;
+
+// Notificação { app, titulo, texto, sub, curta } -> { distancia, descricao, fonte }.
+// Cada app usa os campos de um jeito: o Google Maps põe a instrução no título e a distância no texto curto
+// do chip (Android 16); outros põem "300 m" no título e a rua no texto.
+export function manobraDeNotificacao(n) {
+  const t = DIST.exec(n.titulo || ''), x = DIST.exec(n.texto || ''), c = DIST.exec(n.curta || '');
+  const distancia = (c && c[1]) || (t && t[1]) || (x && x[1]) || '';
+  const descricao = t ? (t[2] || (x ? x[2] : n.texto) || '') : (n.titulo || (x ? x[2] : n.texto) || '');
+  const extra = !t && n.texto && !x ? n.texto : '';
+  return { distancia, descricao, fonte: [n.app, extra, n.sub].filter(Boolean).join(' · ') };
+}
+
+export const mmss = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+
+// 754 s, 5230 m -> "13 min · 5,2 km"
+export function tempoDistancia(segundos, metros) {
+  const min = Math.max(1, Math.round(segundos / 60));
+  const t = min >= 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min`;
+  const d = metros >= 1000 ? `${(metros / 1000).toFixed(1).replace('.', ',')} km` : `${Math.round(metros / 10) * 10} m`;
+  return `${t} · ${d}`;
+}
