@@ -3,10 +3,7 @@ const { chromium } = require('playwright');
 const S = process.argv[2] || 'shots';
 (async () => {
   const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
-  // Ícone PNG 512 a partir do SVG
-  let p = await b.newPage({ viewport: { width: 512, height: 512 } });
-  await p.goto('http://localhost:8080/assets/icon.svg');
-  await p.screenshot({ path: 'assets/icon-512.png', clip: { x: 0, y: 0, width: 512, height: 512 } });
+  let p;
   const seed = {
     v: 1, odo: { km: 103250, data: '2026-11-10' },
     log: [
@@ -27,12 +24,12 @@ const S = process.argv[2] || 'shots';
     p.on('console', (m) => { if (m.type() === 'error') console.log('CONSOLE', name, m.text()); });
     await p.goto('http://localhost:8080/');
     await p.evaluate((s) => localStorage.setItem('asx.v1', JSON.stringify(s)), seed);
-    for (const v of ['', 'manutencao', 'combustivel', 'ficha', 'obd']) {
+    for (const v of ['', 'navegacao', 'manutencao', 'manutencao/ficha', 'manutencao/obd', 'combustivel']) {
       await p.goto('http://localhost:8080/#/' + v);
       await p.reload();
       await p.waitForTimeout(v === '' ? 6000 : 400);
-      if (v === 'obd') { await p.click('[data-action="obd-sim"]'); await p.waitForTimeout(1500); await p.click('[data-action="obd-dtc"]'); await p.waitForTimeout(300); }
-      await p.screenshot({ path: `${S}/shots/${name}-${v || 'inicio'}.png`, fullPage: true });
+      if (v === 'manutencao/obd') { await p.click('[data-action="obd-sim"]'); await p.waitForTimeout(1500); await p.click('[data-action="obd-dtc"]'); await p.waitForTimeout(300); }
+      await p.screenshot({ path: `${S}/${name}-${(v || 'inicio').replace('/', '-')}.png`, fullPage: true });
     }
     await ctx.close();
   }

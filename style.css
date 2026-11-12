@@ -119,20 +119,65 @@ dialog h2 { margin-top: 0; }
 .passos { margin-top: 8px; font-size: 14px; }
 .passos summary { cursor: pointer; color: var(--fg-dim); }
 .passos ol { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 6px; }
-.player .capa { width: 48px; height: 48px; border-radius: 10px; background: var(--bg-2); object-fit: cover; flex: none; border: 1px dashed var(--line); }
-.player .info { flex: 1; min-width: 0; overflow: hidden; }
-.player .t, .player .d { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.player .t { font-weight: 600; }
-.player .d { font-size: 12px; color: var(--fg-dim); }
-.player .ctl { display: flex; gap: 4px; }
-.player .ctl button { background: transparent; color: var(--fg); min-width: 44px; min-height: 44px; padding: 0; border-radius: 50%; border: 1px dashed var(--line); font-size: 18px; line-height: 1; }
-.player .ctl button.play { background: var(--fg); color: var(--bg); border: 0; }
+.capa { width: 48px; height: 48px; border-radius: 10px; background: var(--bg-2); object-fit: cover; flex: none; border: 1px dashed var(--line); }
+.player .info, .w-midia .info { flex: 1; min-width: 0; overflow: hidden; }
+.player .t, .player .d, .w-midia .t, .w-midia .d { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.player .t, .w-midia .t { font-weight: 600; }
+.player .d, .w-midia .d { font-size: 12px; color: var(--fg-dim); }
+.ctl { display: flex; gap: 4px; flex: none; }
+.ctl button { background: transparent; color: var(--fg); min-width: 44px; min-height: 44px; padding: 0; border-radius: 50%; border: 1px dashed var(--line); display: inline-flex; align-items: center; justify-content: center; }
+.ctl button.play { background: var(--fg); color: var(--bg); border: 0; }
+.ctl svg { width: 18px; height: 18px; fill: currentColor; }
+.claro { background: var(--fg); color: var(--bg); }
 .player .atalho { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; color: var(--fg); text-decoration: none; border: 1px dashed var(--line); border-radius: 999px; padding: 8px 14px; font-size: 14px; }
 .player .atalho i { width: 10px; height: 10px; border-radius: 50%; background: var(--red); display: inline-block; }
-.navcard { display: flex; align-items: center; gap: 16px; }
-.navcard img { width: 64px; height: 64px; object-fit: contain; filter: invert(1); flex: none; }
-.navcard .dist { font-size: 40px; line-height: 1; }
-.navcard .desc { font-size: 17px; }
+.navcard { display: flex; align-items: center; gap: 14px; padding: 10px 14px; }
+.navcard img { width: 44px; height: 44px; object-fit: contain; flex: none; }
+.navcard img.inv { filter: invert(1); }
+.navcard .dist { font-size: 28px; line-height: 1; }
+.navcard .desc { font-size: 16px; font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.navlink { text-decoration: none; color: inherit; display: block; }
+.manobra-slot:empty, .faixa-slot:empty, .rota-info:empty { display: none; }
+
+/* Seletor segmentado (subseções de Manutenção) */
+.segctl { display: flex; gap: 4px; margin: 4px 0 12px; padding: 4px; border: 1px dashed var(--line); border-radius: 999px; width: max-content; max-width: 100%; }
+.segctl a { color: var(--fg-dim); text-decoration: none; padding: 0 16px; border-radius: 999px; font-family: var(--dot); font-weight: 700; letter-spacing: .05em; text-transform: uppercase; font-size: 13px; min-height: 40px; display: inline-flex; align-items: center; }
+.segctl a[aria-current] { background: var(--fg); color: var(--bg); }
+
+/* Tela de Navegação: mapa na área principal, mídia e avisos como widgets. Sem rolagem de página. */
+body[data-view=navegacao] { height: 100dvh; }
+body[data-view=navegacao] .main { min-height: 0; max-width: none; padding: 4px 10px 10px; display: flex; overflow: hidden; }
+body[data-view=navegacao] .player { display: none; }
+.nav-view { flex: 1; min-width: 0; min-height: 0; display: grid; gap: 10px; grid-template: "mapa" minmax(0, 1fr) "midia" auto "avisos" minmax(84px, 22dvh) / minmax(0, 1fr); }
+.mapa-area { grid-area: mapa; display: flex; flex-direction: column; gap: 8px; min-height: 0; min-width: 0; }
+.mapa-box { flex: 1; min-height: 100px; border-radius: var(--r); overflow: hidden; background: var(--bg-2); border: 1px dashed var(--line); }
+.mapa-box.gmapa { aspect-ratio: auto; max-height: none; }
+.mapa-box.vazio { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 16px; }
+.destino { gap: 8px; }
+.destino input { min-width: 0; }
+.rota-info { max-height: 34%; overflow: auto; }
+.w-midia { grid-area: midia; min-width: 0; min-height: 0; display: grid; gap: 8px 12px; align-items: center; grid-template: "topo ctl" auto "prog prog" auto / minmax(0, 1fr) auto; padding: 12px 14px; }
+.wm-topo { grid-area: topo; display: flex; align-items: center; gap: 12px; min-width: 0; }
+.wm-prog { grid-area: prog; display: flex; align-items: center; gap: 10px; }
+.wm-barra { flex: 1; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.wm-barra i { display: block; height: 100%; background: var(--fg); border-radius: 3px; }
+.w-midia .ctl { grid-area: ctl; }
+.wm-vazio { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; }
+.w-avisos { grid-area: avisos; min-height: 0; overflow: auto; padding: 12px 14px; }
+.w-avisos h2 { margin: 0 0 6px; }
+.avisos { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.avisos li { border-top: 1px dashed var(--line); padding-top: 8px; display: grid; gap: 6px; }
+.avisos li:first-child { border-top: 0; padding-top: 0; }
+.av-corpo { background: none; color: inherit; border-radius: 8px; padding: 0; min-height: 0; text-align: left; font-weight: 400; display: grid; gap: 2px; width: 100%; }
+.av-corpo .t { font-weight: 600; }
+.av-corpo .tx { font-size: 14px; color: var(--fg-dim); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.av-acoes { display: flex; gap: 6px; }
+@media (orientation: landscape) and (min-width: 640px) {
+  .nav-view { grid-template: "mapa midia" auto "mapa avisos" minmax(0, 1fr) / minmax(0, 2.2fr) minmax(220px, 1fr); }
+  .w-midia { grid-template: "topo" auto "prog" auto "ctl" auto / minmax(0, 1fr); }
+  .w-midia .ctl { justify-content: center; }
+  .w-midia .capa { width: 56px; height: 56px; }
+}
 
 /* Modelo 3D */
 .car3d { width: 100%; height: auto; aspect-ratio: 3 / 2; max-height: 420px; background: transparent; --poster-color: transparent; display: block; }
@@ -210,8 +255,8 @@ dialog h2 { margin-top: 0; }
   .card { padding: 12px 14px; }
   .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-flow: dense; gap: 10px; }
   .grid .span-2 { grid-column: span 2; }
-  .grid .mapa-card { grid-column: span 2; }
-  .gmapa { aspect-ratio: 16 / 9; max-height: 190px; }
+  body[data-view=navegacao] .top { display: none; }
+  body[data-view=navegacao] .main { padding: 8px 10px; }
   .car3d { aspect-ratio: 16 / 7; max-height: 190px; }
   .big { font-size: 30px; }
   .card .row { flex-wrap: wrap; row-gap: 6px; }
@@ -221,5 +266,8 @@ dialog h2 { margin-top: 0; }
   .player .barra { min-height: 52px; padding: 4px 16px; gap: 10px; }
   .player .capa { width: 40px; height: 40px; }
   .player .ctl button { min-width: 40px; min-height: 40px; }
+  .w-midia { padding: 10px 12px; gap: 6px; }
+  .w-midia .capa { width: 44px; height: 44px; }
+  .w-avisos { padding: 10px 12px; }
   dialog { max-height: 94dvh; }
 }
