@@ -1,2 +1,5 @@
 node_modules/
+shots/
 .DS_Store
+asx-backup-*.json
+package-lock.json
