@@ -11,11 +11,18 @@ export function ultimoRegistro(itemId, log) {
   return log.filter((e) => e.itens.includes(itemId)).sort((a, b) => b.km - a.km)[0] || null;
 }
 
-// Retorna { status, pct, kmRestante, diasRestante, ultimo }.
-// status: 'sem' (nunca registrado), 'ok', 'breve' (>= 80%), 'vencido'.
+// Retorna { status, pct, kmRestante, diasRestante, ultimo, estimado }.
+// status: 'sem' (sem registro e sem odômetro), 'ok', 'breve' (>= 80%), 'vencido'.
+// Sem registro mas com odômetro, estima pelo múltiplo do intervalo (plano por km fixo:
+// 5.000, 10.000, 20.000…): próxima aos próximos N km, só por quilometragem.
 export function situacao(item, log, odoKm, hoje = new Date()) {
   const ultimo = ultimoRegistro(item.id, log);
-  if (!ultimo) return { status: 'sem', pct: 0, ultimo: null };
+  if (!ultimo) {
+    if (!(odoKm > 0)) return { status: 'sem', pct: 0, ultimo: null };
+    const proximo = (Math.floor(odoKm / item.km) + 1) * item.km;
+    const pct = 1 - (proximo - odoKm) / item.km;
+    return { status: pct >= 0.8 ? 'breve' : 'ok', pct, kmRestante: proximo - odoKm, proximo, ultimo: null, estimado: true };
+  }
   const pctKm = (odoKm - ultimo.km) / item.km;
   const pctTempo = mesesEntre(ultimo.data, hoje) / item.meses;
   const pct = Math.max(pctKm, pctTempo, 0);

@@ -70,7 +70,7 @@ small { font-size: 12px; }
 .card.dark .seg i { background: var(--line); }
 .card.dark .seg i.on { background: var(--fg); }
 
-.chip { display: inline-block; font-family: var(--dot); font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; border: 1px dashed currentColor; }
+.chip { display: inline-block; white-space: nowrap; font-family: var(--dot); font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; border: 1px dashed currentColor; }
 .chip.vencido { color: var(--red); border-style: solid; }
 .chip.breve { color: #9a6b00; }
 .chip.ok { color: var(--ok); }

@@ -31,7 +31,7 @@ const brl = (n) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL
 const dataBr = (s) => s.split('-').reverse().join('/');
 const seg = (pct, status) => `<div class="seg ${status}" aria-hidden="true">${[1, 2, 3, 4].map((i) => `<i class="${pct * 4 >= i - 0.5 ? 'on' : ''}"></i>`).join('')}</div>`;
 const chipTxt = { vencido: 'Vencido', breve: 'Em breve', ok: 'Em dia', sem: 'Sem registro' };
-const chip = (st) => `<span class="chip ${st}">${chipTxt[st]}</span>`;
+const chip = (st, est) => `<span class="chip ${st}">${chipTxt[st]}${est ? ' · est.' : ''}</span>`;
 const main = document.getElementById('main');
 const dlg = document.getElementById('dlg');
 let toastT;
@@ -41,7 +41,8 @@ function toast(msg) {
   clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2500);
 }
 function descricao(s) {
-  if (s.status === 'sem') return 'Registre a última vez que foi feito.';
+  if (s.status === 'sem') return 'Informe o odômetro ou registre a última vez que foi feito.';
+  if (s.estimado) return `Sem registro · pela quilometragem, próxima aos ${km(s.proximo)} km (faltam ${km(s.kmRestante)} km)`;
   const partes = [];
   partes.push(s.kmRestante >= 0 ? `faltam ${km(s.kmRestante)} km` : `${km(-s.kmRestante)} km atrasado`);
   partes.push(s.diasRestante >= 0 ? `${s.diasRestante} dias` : `${-s.diasRestante} dias atrasado`);
@@ -83,7 +84,7 @@ function inicio() {
             <small class="muted">${descricao(l)}</small>
             ${seg(l.pct, l.status)}
           </div>
-          ${chip(l.status)}
+          ${chip(l.status, l.estimado)}
         </button>`).join('')}
       <div class="actions"><a class="btn btn-ghost btn-sm" href="#/manutencao" style="text-decoration:none;display:inline-flex;align-items:center">Ver plano completo</a></div>
     </section>
@@ -111,11 +112,11 @@ function manutencao(q) {
       <button class="btn-sm" data-action="registrar">+ Registrar serviço</button>
     </div>
   </div>
-  <p class="muted" style="margin:0 0 12px"><small>Intervalos para uso severo (Brasil). Vence o que chegar primeiro: km ou tempo. Odômetro atual: ${km(S.odo.km)} km.</small></p>
+  <p class="muted" style="margin:0 0 12px"><small>Intervalos para uso severo (Brasil). Vence o que chegar primeiro: km ou tempo. Odômetro atual: ${km(S.odo.km)} km. Itens "est." são estimados pelo odômetro (múltiplos do intervalo) até você registrar o serviço.</small></p>
   <div class="grid">
     ${lista.map((l) => `
     <section class="card ${l.status === 'vencido' ? 'alert' : ''}">
-      <div class="row"><h2 style="margin:0">${esc(l.item.nome)}</h2>${chip(l.status)}</div>
+      <div class="row"><h2 style="margin:0">${esc(l.item.nome)}</h2>${chip(l.status, l.estimado)}</div>
       <small class="muted">A cada ${km(l.item.km)} km ou ${l.item.meses} meses</small>
       ${seg(l.pct, l.status)}
       <p style="margin:10px 0 4px"><small>${descricao(l)}</small></p>
