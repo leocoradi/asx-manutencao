@@ -103,7 +103,7 @@ export class Hudiy {
         else if (id === MSG.HELLO_RESP) {
           clearTimeout(t);
           if (protoCampos(payload)[3]?.[0] !== 1) return rej(new Error('Hudiy recusou a versão da API.'));
-          this.#ws = ws; ws.send(quadro(MSG.SUBS, msgSubs())); res(); this.#emitir('abriu');
+          this.#ws = ws; ws.send(quadro(MSG.SUBS, msgSubs())); res();
         } else if (id === MSG.OBD_RESP) {
           const r = obdResp(payload);
           const p = this.#pendentes.get(r.codigo); this.#pendentes.delete(r.codigo); p?.res(r);
@@ -125,5 +125,4 @@ export class Hudiy {
     });
   }
 
-  desconectar() { this.#ws?.close(); }
 }

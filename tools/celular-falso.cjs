@@ -15,7 +15,7 @@ const estado = (carro) => ({ acesso: true, carro: { ativo: carro, salvo: 'ASX RÃ
     p.on('pageerror', (e) => { if (!/Unexpected token/.test(e.message)) console.log('PAGEERROR', nome, e.message); });
     await p.addInitScript((e) => {
       window.__cmds = []; window.__estado = e;
-      window.AsxNative = { versao: () => 3, versaoApp: () => '1.12', temAcesso: () => true, pedirAcesso: () => {}, midia: (c) => window.__cmds.push(c), estado: () => JSON.stringify(window.__estado),
+      window.AsxNative = { versaoApp: () => '1.12', pedirAcesso: () => {}, midia: (c) => window.__cmds.push(c), estado: () => JSON.stringify(window.__estado),
         aviso: (a, k) => window.__cmds.push(`aviso:${a}:${k}`), modoCarro: (l) => window.__cmds.push('carro:' + l), lembrarCarro: (n) => window.__cmds.push('lembrar:' + n),
         apps: () => JSON.stringify([{ id: 'com.waze', nome: 'Waze', tipo: 'nav' }, { id: 'com.google.android.apps.youtube.music', nome: 'YouTube Music', tipo: 'musica' }, { id: 'com.andrerinas.headunitrevived', nome: 'Android Auto', tipo: 'auto' }]),
         abrirApp: (id) => window.__cmds.push('app:' + id), bateriaLivre: () => false, pedirBateria: () => window.__cmds.push('bateria'), procurarAtualizacao() {}, instalarAtualizacao() {} };
@@ -24,6 +24,7 @@ const estado = (carro) => ({ acesso: true, carro: { ativo: carro, salvo: 'ASX RÃ
       const ler = () => ({ coords: { latitude: (lat += 0.0012), longitude: -46.63, accuracy: 8, speed: 16.7 }, timestamp: Date.now() + 8000 * n++ });
       navigator.geolocation.getCurrentPosition = (ok) => ok(ler());
       navigator.geolocation.watchPosition = (ok) => setInterval(() => ok(ler()), 300);
+      navigator.geolocation.clearWatch = clearInterval;
     }, estado(carro));
     await p.goto('http://localhost:8080/#/navegacao'); await p.waitForTimeout(1300);
     await p.screenshot({ path: `${out}/nav-${nome}.png` });

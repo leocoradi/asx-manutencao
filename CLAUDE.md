@@ -5,7 +5,7 @@ Leia também `docs/ESTADO.md` (o que existe, decisões, pendências) e `docs/CEN
 ## Regras do projeto
 
 - **Minimalismo (ponytail)**: a menor mudança que resolve o pedido inteiro. Ordem: não construir se não foi pedido → reutilizar o que já existe → stdlib/plataforma → dependência já instalada → código direto → mínimo novo. Nunca cortar validação em fronteiras de confiança, tratamento de erro que evita perda de dados, segurança e acessibilidade.
-- **Sem build e sem dependências de runtime**: HTML, CSS e ES modules servidos estáticos. Bibliotecas de terceiros entram vendoradas em `vendor/` com a licença ao lado (hoje: model-viewer e decodificador meshopt). Fontes do Google Fonts são a única carga externa fixa.
+- **Sem build e sem dependências de runtime**: HTML, CSS e ES modules servidos estáticos. Bibliotecas e fontes de terceiros entram vendoradas em `vendor/` com a licença ao lado (hoje: model-viewer, decodificador meshopt e a fonte Doto). Nenhuma carga externa fixa; o Google Maps só carrega com a chave do usuário.
 - **Idioma**: interface, comentários, commits e documentação em português do Brasil.
 - **Dados do usuário só no aparelho**: `localStorage` (registros em `asx.v1`, chaves e preferências em `asx.*`). Nenhum backend, nenhuma telemetria. Chaves de API do usuário nunca vão para o repositório.
 - **Repositório público**: não commitar backups (`asx-backup-*.json`), chaves, e-mails, endereços ou qualquer dado pessoal. Commits usam o endereço noreply.
@@ -19,7 +19,7 @@ Leia também `docs/ESTADO.md` (o que existe, decisões, pendências) e `docs/CEN
 index.html          app shell, navegação, rodapé do player
 style.css           tema (Nothing UI: preto, cartões brancos, fonte Doto, tracejados, vermelho só em alerta) e breakpoints
 src/app.js          estado, telas (Início, Navegação, Manutenção com Plano/Ficha/OBD, Combustível), formulários, backup, mídia, avisos, mapa, Hudiy
-src/painel.js       lógica pura: rotas das abas, manobra a partir da notificação, formatação
+src/painel.js       lógica pura: rotas das abas, manobra a partir da notificação, odômetro por GPS, formatação
 src/data.js         base técnica do veículo e plano de manutenção (uso severo)
 src/plan.js         vencimento (km/tempo, estimativa pelo odômetro) e consumo
 src/car.js          modelo 3D (model-viewer) e silhueta SVG com pontos por área
@@ -27,7 +27,7 @@ src/obd.js          decodificador OBDb v3, ISO-TP, DTCs, transportes (Bluetooth 
 src/signalset.js    sinais no formato OBDb (CC-BY-SA-4.0)
 src/hudiy.js        cliente da API da central Hudiy (protobuf mínimo à mão)
 src/mapa.js         Google Maps JS (trânsito) + Routes API + links para o Vela
-sw.js               cache offline (bump de CACHE a cada mudança no shell)
+sw.js               cache offline só dos arquivos do app (bump de CACHE a cada mudança no shell)
 tests/              node --test
 tools/              servidor Hudiy falso, ponte nativa falsa, capturas de tela, mapa falso
 hudiy/              configs de exemplo para registrar o app na central

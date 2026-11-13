@@ -9,10 +9,7 @@ export const textoDeHtml = (html) => String(html ?? '').replace(/<[^>]*>/g, ' ')
 export function linksNavegar(destino, lat, lng) {
   const rotulo = encodeURIComponent(destino.trim());
   const temPos = Number.isFinite(lat) && Number.isFinite(lng);
-  return {
-    geo: temPos ? `geo:${lat},${lng}?q=${lat},${lng}(${rotulo})` : `geo:0,0?q=${rotulo}`,
-    google: temPos ? `google.navigation:q=${lat},${lng}&mode=d` : `google.navigation:q=${rotulo}&mode=d`,
-  };
+  return { geo: temPos ? `geo:${lat},${lng}?q=${lat},${lng}(${rotulo})` : `geo:0,0?q=${rotulo}` };
 }
 
 let carregando;

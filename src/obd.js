@@ -96,7 +96,7 @@ const PERFIS = [
 ];
 
 export class Elm327Ble {
-  #write; #buf = ''; #pendente = null; #header = '';
+  #gatt; #write; #buf = ''; #pendente = null; #header = '';
   nome = '';
 
   async conectar() {
@@ -105,7 +105,7 @@ export class Elm327Ble {
       acceptAllDevices: true, optionalServices: PERFIS.map((p) => p.svc),
     });
     this.nome = dev.name || 'ELM327';
-    const gatt = await dev.gatt.connect();
+    const gatt = this.#gatt = await dev.gatt.connect();
     let erro;
     for (const p of PERFIS) {
       try {
@@ -156,16 +156,18 @@ export class Elm327Ble {
     const q = montarQuadros(await this.enviar('03'));
     return decodificarDtcs(q['7E8'] ?? Object.values(q)[0] ?? []);
   }
+
+  desconectar() { this.#gatt?.disconnect(); }
 }
 
 // --- Transporte pela central Hudiy: a central cuida do ELM327 e responde sem cabeçalho (ex.: "410D74"). ---
 export class HudiyObd {
   nome = 'Hudiy';
-  constructor(cliente) { this.cliente = cliente; }
-  async conectar() {
-    await this.cliente.conectar();
-    this.cliente.on(MSG.OBD_STATUS, (p) => { if (protoCampos(p)[1]?.[0] === 2) this.onStatus?.('ELM327 desconectado do carro'); });
+  constructor(cliente) {
+    this.cliente = cliente;
+    cliente.on(MSG.OBD_STATUS, (p) => { if (protoCampos(p)[1]?.[0] === 2) this.onStatus?.('ELM327 desconectado do carro'); });
   }
+  conectar() { return this.cliente.conectar(); }
   // Só os PIDs padrão da ECU 7E0: a API não troca o cabeçalho CAN (sem ATSH).
   async consultar(cmd) {
     if (cmd.hdr !== '7E0') return null;

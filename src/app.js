@@ -1,6 +1,6 @@
 import { VEICULO, AREAS, PLANO, FLUIDOS, FICHA, PNEUS, LAMPADAS, FUSIVEIS } from './data.js';
-import { situacao, ordenar, consumo } from './plan.js';
-import { carro, carro3d, CARRO_3D } from './car.js';
+import { ordenar, consumo, PESO } from './plan.js';
+import { carro3d, CARRO_3D } from './car.js';
 import { Elm327Ble, HudiyObd, Simulador, COMANDOS } from './obd.js';
 import { Hudiy, MSG, TECLA, mediaStatus, mediaMeta, navStatus, navDetalhes, navDistancia, imagemUrl } from './hudiy.js';
 import { carregarGoogle, MapaTransito, linksNavegar } from './mapa.js';
@@ -37,6 +37,10 @@ const chipTxt = { vencido: 'Vencido', breve: 'Em breve', ok: 'Em dia', sem: 'Sem
 const chip = (st, est) => `<span class="chip ${st}">${chipTxt[st]}${est ? ' · est.' : ''}</span>`;
 const main = document.getElementById('main');
 const dlg = document.getElementById('dlg');
+// Só toca no DOM quando o HTML muda. No APK o estado inteiro chega de novo a cada notificação, e a da navegação
+// muda a cada segundo; sem isso o rodapé e os widgets seriam refeitos (e a capa redecodificada) toda vez.
+const pintado = new WeakMap();
+function pintar(el, html) { if (el && pintado.get(el) !== html) { pintado.set(el, html); el.innerHTML = html; } }
 let toastT;
 function toast(msg) {
   const t = document.getElementById('toast');
@@ -58,8 +62,7 @@ function inicio() {
   const porArea = {};
   for (const l of lista) {
     const a = l.item.area;
-    const peso = { vencido: 0, breve: 1, sem: 2, ok: 3 };
-    if (!porArea[a] || peso[l.status] < peso[porArea[a]]) porArea[a] = l.status;
+    if (!porArea[a] || PESO[l.status] < PESO[porArea[a]]) porArea[a] = l.status;
   }
   const c = consumo(S.fuel);
   const vencidos = lista.filter((l) => l.status === 'vencido').length;
@@ -86,15 +89,15 @@ function inicio() {
     <section class="card ${vencidos ? 'alert' : ''} span-2">
       <div class="row"><h2>Próximas manutenções</h2>${vencidos ? `<span class="chip vencido">${vencidos} vencido${vencidos > 1 ? 's' : ''}</span>` : ''}</div>
       ${lista.slice(0, 4).map((l) => `
-        <button class="row" style="width:100%;background:none;color:inherit;padding:10px 0;border-bottom:1px dashed var(--card-line);border-radius:0;text-align:left" data-action="ir" data-area="${l.item.area}">
-          <div class="stack" style="flex:1">
+        <button class="row prox" data-action="ir" data-area="${l.item.area}">
+          <div class="stack">
             <span class="t">${esc(l.item.nome)}</span>
             <small class="muted">${descricao(l)}</small>
             ${seg(l.pct, l.status)}
           </div>
           ${chip(l.status, l.estimado)}
         </button>`).join('')}
-      <div class="actions"><a class="btn btn-ghost btn-sm" href="#/manutencao" style="text-decoration:none;display:inline-flex;align-items:center">Ver plano completo</a></div>
+      <div class="actions"><a class="btn btn-ghost btn-sm" href="#/manutencao">Ver plano completo</a></div>
     </section>
     <section class="card">
       <h2>Combustível</h2>
@@ -102,7 +105,7 @@ function inicio() {
         <div class="row"><div><div class="num mid">${c.ultimo.toFixed(1)}<span class="u muted" style="font-size:14px;font-family:var(--sans)"> km/L</span></div><small class="muted">último tanque</small></div>
         <div class="r"><div class="num mid">${c.media.toFixed(1)}</div><small class="muted">média geral</small></div></div>`
       : `<p class="muted">Registre abastecimentos com tanque cheio para ver a média.</p>`}
-      <div class="actions"><a class="btn btn-sm" href="#/combustivel" style="text-decoration:none;display:inline-flex;align-items:center">Registrar abastecimento</a></div>
+      <div class="actions"><a class="btn btn-sm" href="#/combustivel">Registrar abastecimento</a></div>
     </section>
   </div>`;
 }
@@ -155,7 +158,7 @@ function plano(q) {
   <div class="row" style="margin:8px 0 12px;flex-wrap:wrap">
     <h1>Plano${area ? ` · ${AREAS[area]}` : ''}</h1>
     <div class="actions" style="margin:0">
-      ${area ? '<a class="btn btn-ghost btn-sm" href="#/manutencao" style="text-decoration:none;display:inline-flex;align-items:center">Todas as áreas</a>' : ''}
+      ${area ? '<a class="btn btn-ghost btn-sm" href="#/manutencao">Todas as áreas</a>' : ''}
       <button class="btn-sm" data-action="registrar">+ Registrar serviço</button>
     </div>
   </div>
@@ -191,7 +194,7 @@ function combustivel() {
   // Custo/km: só o combustível gasto dentro dos trechos medidos (entre o 1º e o último tanque cheio).
   const valorTrechos = S.fuel.filter((f) => f.km > Math.min(...cheios) && f.km <= Math.max(...cheios)).reduce((s, f) => s + f.valor, 0);
   return `
-  <h1 style="margin:8px 0 12px">Combustível</h1>
+  <h1>Combustível</h1>
   <div class="grid">
     <section class="card span-2">
       <h2>Novo abastecimento</h2>
@@ -211,7 +214,7 @@ function combustivel() {
       ${c.media ? `
       <div class="row"><div><div class="num mid">${c.ultimo.toFixed(1)}</div><small class="muted">km/L último</small></div>
         <div><div class="num mid">${c.media.toFixed(1)}</div><small class="muted">km/L média</small></div>
-        <div class="r"><div class="num mid">${(valorTrechos / kmTot).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div><small class="muted">por km</small></div></div>`
+        <div class="r"><div class="num mid">${brl(valorTrechos / kmTot)}</div><small class="muted">por km</small></div></div>`
       : '<p class="muted">A média usa trechos entre dois abastecimentos com tanque cheio.</p>'}
       <p class="muted" style="margin:12px 0 0"><small>Total gasto: ${brl(gasto)} · tanque ${VEICULO.tanqueL} L · gasolina</small></p>
     </section>
@@ -221,7 +224,7 @@ function combustivel() {
     ${lista.length ? lista.map((f) => `
       <div>
         <div class="stack"><span class="t">${f.litros.toLocaleString('pt-BR')} L · ${brl(f.valor)}${f.cheio ? '' : ' · parcial'}</span>
-          <span class="d">${dataBr(f.data)} · ${km(f.km)} km · ${(f.valor / f.litros).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/L</span></div>
+          <span class="d">${dataBr(f.data)} · ${km(f.km)} km · ${brl(f.valor / f.litros)}/L</span></div>
         <button class="btn-ghost btn-sm" data-action="apagar-fuel" data-id="${f.id}" aria-label="Apagar abastecimento de ${dataBr(f.data)}">Apagar</button>
       </div>`).join('') : '<div class="empty">Nenhum abastecimento registrado.</div>'}
   </div>`;
@@ -230,7 +233,7 @@ function combustivel() {
 const tabela = (linhas, cab) => `<table>${cab ? `<thead><tr>${cab.map((c) => `<th>${c}</th>`).join('')}</tr></thead>` : ''}<tbody>${linhas.map((l) => `<tr>${l.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 function ficha() {
   return `
-  <h1 style="margin:8px 0 12px">Ficha técnica</h1>
+  <h1>Ficha técnica</h1>
   <div class="grid">
     <section class="card"><h2>Motor e dimensões</h2>${tabela([['Motor', VEICULO.motor], ['Câmbio', VEICULO.cambio], ['Tração', VEICULO.tracao], ['Combustível', VEICULO.combustivel], ...FICHA])}</section>
     <section class="card"><h2>Fluidos e capacidades</h2>${tabela(FLUIDOS, ['Sistema', 'Volume', 'Especificação'])}
@@ -257,7 +260,7 @@ function tiles() {
 function obdView() {
   const on = !!obd.tx;
   return `
-  <h1 style="margin:8px 0 12px">Diagnóstico OBD</h1>
+  <h1>Diagnóstico OBD</h1>
   <section class="card dark">
     <div class="row" style="flex-wrap:wrap">
       <div class="stack"><span class="t">${on ? `Conectado: ${esc(obd.tx.nome)}` : 'Desconectado'}</span>
@@ -350,7 +353,7 @@ function dlgConfig() {
   <p>Os dados ficam só neste aparelho. Exporte um JSON de vez em quando e importe em outro aparelho.</p>
   <div class="actions">
     <button data-action="exportar">Exportar JSON</button>
-    <label class="btn btn-ghost" style="display:inline-flex;align-items:center;cursor:pointer">Importar JSON<input type="file" accept="application/json,.json" data-action="importar" hidden></label>
+    <label class="btn btn-ghost">Importar JSON<input type="file" accept="application/json,.json" data-action="importar" hidden></label>
   </div>
   <h2 style="margin-top:20px">Google Maps</h2>
   <form data-form="gm">
@@ -406,7 +409,7 @@ async function importar(file) {
 // --- Eventos ---
 function formDados(f) {
   const fd = new FormData(f);
-  return { data: fd.get('data'), km: +fd.get('km'), litros: +fd.get('litros'), valor: +fd.get('valor'), custo: +fd.get('custo') || 0, obs: (fd.get('obs') || '').trim(), cheio: fd.get('cheio') === 'on', itens: fd.getAll('itens'), destino: (fd.get('destino') || '').trim(), url: (fd.get('url') || '').trim(), chave: (fd.get('chave') || '').trim() };
+  return { data: fd.get('data'), km: +fd.get('km'), litros: +fd.get('litros'), valor: +fd.get('valor'), custo: +fd.get('custo') || 0, obs: (fd.get('obs') || '').trim(), cheio: fd.get('cheio') === 'on', itens: fd.getAll('itens'), destino: (fd.get('destino') || '').trim(), chave: (fd.get('chave') || '').trim() };
 }
 function atualizaOdo(kmNovo, data) {
   // Uma leitura real acima da última digitada substitui o que o GPS somou desde então.
@@ -467,7 +470,7 @@ document.addEventListener('click', (e) => {
   else if (a === 'app') window.AsxNative.abrirApp(el.dataset.id);
   else if (a.startsWith('aviso-')) window.AsxNative.aviso(a.slice(6), el.dataset.chave);
   else if (a === 'obd-ble') obdConectar(new Elm327Ble());
-  else if (a === 'obd-hudiy') { conectarCentral(); obdConectar(new HudiyObd(central)); }
+  else if (a === 'obd-hudiy') { conectarCentral(); obdConectar(obdCentral); }
   else if (a === 'obd-sim') obdConectar(new Simulador());
   else if (a === 'obd-off') obdDesconectar();
   else if (a === 'obd-dtc') obd.tx.dtcs().then((d) => { obd.dtcs = d; logObd(`DTCs: ${d.join(', ') || 'nenhum'}`); render(); }).catch((err) => toast(err.message));
@@ -497,6 +500,7 @@ main.addEventListener('keydown', (e) => { const h = e.target.closest('.hot'); if
 
 // --- Manobra em andamento: vem da central Hudiy (Android Auto) ou da notificação do navegador no celular ---
 const central = new Hudiy();
+const obdCentral = new HudiyObd(central);
 const midia = { titulo: '', artista: '', posicao: '', duracao: '', tocando: false, capaUrl: null };
 const nav = { ativo: false, descricao: '', distancia: '', iconeUrl: null, fonte: '', central: false, inverter: false };
 const trocarUrl = (obj, chave, bytes) => { if (obj[chave]) URL.revokeObjectURL(obj[chave]); obj[chave] = imagemUrl(bytes); };
@@ -518,8 +522,8 @@ function manobraHtml() {
 // No Início: faixa compacta que leva à aba Navegação.
 function faixaHtml() { return nav.ativo ? `<a class="navlink" href="#/navegacao">${manobraHtml()}</a>` : ''; }
 function atualizarManobra() {
-  const s = main.querySelector('.manobra-slot'); if (s) s.innerHTML = manobraHtml();
-  const f = main.querySelector('.faixa-slot'); if (f) f.innerHTML = faixaHtml();
+  pintar(main.querySelector('.manobra-slot'), manobraHtml());
+  pintar(main.querySelector('.faixa-slot'), faixaHtml());
 }
 // O ícone da notificação pode ser claro ou escuro conforme o tema do sistema; no cartão branco, o claro é invertido.
 function iconeClaro(url) {
@@ -548,10 +552,15 @@ function localizar(pedido) {
     vigiarPosicao();
   }, (e) => { if (pedido) toast(e.code === 1 ? 'Permissão de localização negada.' : 'Não foi possível obter a posição.'); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
 }
-let vigia;
+// O GPS de alta precisão só fica ligado onde é usado: no modo carro (velocidade e odômetro) e, com a posição
+// já liberada, na aba Navegação (marcador no mapa). Chamado a cada render e a cada mudança do modo carro.
+let vigia = null;
 function vigiarPosicao() {
-  vigia ??= navigator.geolocation?.watchPosition((g) => { pos = { lat: g.coords.latitude, lon: g.coords.longitude }; gm.mapa?.posicao(pos); aoGps(g.coords, g.timestamp); },
-    () => { gps.vel = null; painelGps(); }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 });
+  const precisa = !!navigator.geolocation && (cel.carro?.ativo || (pos && document.body.dataset.view === 'navegacao'));
+  if (precisa && vigia == null) {
+    vigia = navigator.geolocation.watchPosition((g) => { pos = { lat: g.coords.latitude, lon: g.coords.longitude }; gm.mapa?.posicao(pos); aoGps(g.coords, g.timestamp); },
+      () => { gps.vel = null; painelGps(); }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 });
+  } else if (!precisa && vigia != null) { navigator.geolocation.clearWatch(vigia); vigia = null; }
 }
 
 // --- GPS no modo carro: velocidade no Início e odômetro automático ---
@@ -571,8 +580,6 @@ function painelGps() {
   const set = (k, v) => { const el = main.querySelector(`[data-gps="${k}"]`); if (el) el.textContent = v; };
   set('vel', gps.vel ?? '--'); set('odo', km(S.odo.km)); set('odo-info', odoInfo());
 }
-// O resto em metros (menos de 1 km) é gravado quando a central sai da tela.
-document.addEventListener('visibilitychange', () => { if (document.hidden && cel.carro?.ativo) salvar(); });
 
 // --- Mapa do Google com trânsito (chave do usuário) ---
 const gm = { chave: localStorage.getItem('asx.gmaps') || '', mapa: null, resumo: null, destino: '' };
@@ -630,7 +637,7 @@ function aplicarCarro(antes) {
   btnCarro.setAttribute('aria-pressed', String(ativo));
   btnCarro.setAttribute('aria-label', ativo ? 'Sair do modo carro' : 'Entrar no modo carro');
   if (ativo === antes) return;
-  if (ativo) vigiarPosicao(); else Object.assign(gps, { ref: null, vel: null });
+  vigiarPosicao(); if (!ativo) Object.assign(gps, { ref: null, vel: null });
   // O Início muda com o modo carro (velocidade e atalhos): volta para ele ao entrar e redesenha se já estiver nele.
   if (ativo && location.hash !== '#/') location.hash = '#/'; else if (document.body.dataset.view === 'inicio') render();
 }
@@ -643,7 +650,10 @@ function celSincronizar() {
   try { cel.apps = JSON.parse(window.AsxNative.apps?.() || '[]'); } catch { cel.apps = []; }
   try { celAplicar(JSON.parse(window.AsxNative.estado())); } catch {}
 }
-document.addEventListener('visibilitychange', () => { if (!document.hidden) celSincronizar(); });
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) celSincronizar();
+  else if (cel.carro?.ativo) salvar(); // resto em metros do odômetro por GPS (menos de 1 km), gravado quando a central sai da tela
+});
 
 // --- Mídia: rodapé (todas as abas) e widget (aba Navegação), com a mesma fonte de dados ---
 const IC = {
@@ -673,15 +683,22 @@ function semMidiaHtml() {
 }
 function renderPlayer() {
   const i = midiaInfo(), vazio = semMidiaHtml();
-  document.getElementById('player').innerHTML = i
-    ? `<div class="barra">${capaHtml(i)}<div class="info"><div class="t">${esc(i.titulo)}</div><div class="d" data-midia-tempo="artista">${esc(i.artista)}${i.tempo ? ` · ${esc(i.tempo)}` : ''}</div></div>${ctlHtml(i)}</div>`
-    : vazio && !cel.acesso ? `<div class="barra">${vazio}</div>` : ''; // sem mídia, o rodapé some; só o pedido de permissão ocupa espaço
+  pintar(document.getElementById('player'), i
+    ? `<div class="barra">${capaHtml(i)}<div class="info"><div class="t">${esc(i.titulo)}</div><div class="d" data-midia-tempo="artista"></div></div>${ctlHtml(i)}</div>`
+    : vazio && !cel.acesso ? `<div class="barra">${vazio}</div>` : ''); // sem mídia, o rodapé some; só o pedido de permissão ocupa espaço
+  tempoMidia(i);
+}
+// Artista, tempo e barra de progresso ficam fora do HTML comparado por pintar(): o tempo muda a cada segundo.
+function tempoMidia(i = midiaInfo()) {
+  if (!i) return;
+  document.querySelectorAll('[data-midia-tempo]').forEach((d) => { d.textContent = d.dataset.midiaTempo === 'so' ? i.tempo : [i.artista, i.tempo].filter(Boolean).join(' · '); });
+  document.querySelectorAll('[data-midia-barra]').forEach((b) => { b.style.width = `${(i.pct ?? 0) * 100}%`; });
 }
 function widgetMidiaHtml() {
   const i = midiaInfo();
   if (!i) return `<div class="wm-vazio">${semMidiaHtml() || '<div class="info"><div class="t">Mídia</div><div class="d">O player do celular aparece aqui no app Android ou na central.</div></div>'}</div>`;
   return `<div class="wm-topo">${capaHtml(i)}<div class="info"><div class="t">${esc(i.titulo)}</div><div class="d">${esc(i.artista)}</div></div></div>
-    <div class="wm-prog"><div class="wm-barra"><i data-midia-barra style="width:${(i.pct ?? 0) * 100}%"></i></div><small class="muted" data-midia-tempo="so">${esc(i.tempo)}</small></div>
+    <div class="wm-prog"><div class="wm-barra"><i data-midia-barra></i></div><small class="muted" data-midia-tempo="so"></small></div>
     ${ctlHtml(i)}`;
 }
 const hora = (ms) => new Date(ms).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -693,14 +710,11 @@ function widgetAvisosHtml() {
     <div class="av-acoes"><button class="btn-ghost btn-sm" data-action="aviso-ouvir" data-chave="${esc(a.chave)}">Ouvir</button><button class="btn-ghost btn-sm" data-action="aviso-dispensar" data-chave="${esc(a.chave)}">Dispensar</button></div></li>`).join('')}</ul>`;
 }
 function renderWidgets() {
-  const m = main.querySelector('.w-midia'); if (m) m.innerHTML = widgetMidiaHtml();
-  const a = main.querySelector('.w-avisos'); if (a) a.innerHTML = widgetAvisosHtml();
+  const m = main.querySelector('.w-midia'), a = main.querySelector('.w-avisos');
+  if (m) { pintar(m, widgetMidiaHtml()); tempoMidia(); }
+  if (a) pintar(a, widgetAvisosHtml());
 }
-setInterval(() => { // posição corrente enquanto toca, sem esperar evento do Android
-  const i = midiaInfo(); if (!i?.tocando || !i.tempo) return;
-  document.querySelectorAll('[data-midia-tempo]').forEach((d) => { d.textContent = d.dataset.midiaTempo === 'so' ? i.tempo : `${i.artista} · ${i.tempo}`; });
-  if (i.pct != null) document.querySelectorAll('[data-midia-barra]').forEach((b) => { b.style.width = `${i.pct * 100}%`; });
-}, 1000);
+setInterval(() => { const i = midiaInfo(); if (i?.tocando) tempoMidia(i); }, 1000); // posição corrente enquanto toca, sem esperar evento do Android
 document.addEventListener('click', (e) => {
   const c = e.target.closest('[data-cel]'); if (c && window.AsxNative) return window.AsxNative.midia(c.dataset.cel);
   const t = e.target.closest('[data-tecla]'); if (t) central.tecla(+t.dataset.tecla);
@@ -716,6 +730,7 @@ function render() {
   document.querySelectorAll('.nav a').forEach((a) => a.toggleAttribute('aria-current', a.dataset.view === r.view));
   if (r.view === 'inicio') montarCarro3d();
   if (r.view === 'navegacao') { montarMapa(); renderWidgets(); }
+  vigiarPosicao();
 }
 window.addEventListener('hashchange', () => { render(); main.focus({ preventScroll: true }); window.scrollTo(0, 0); });
 renderPlayer();

@@ -130,11 +130,11 @@ src/app.js          estado, rotas, telas, formulários, backup
 src/data.js         base técnica do veículo e plano de manutenção
 src/plan.js         vencimentos e consumo
 src/car.js          modelo 3D e silhueta SVG com pontos de atenção
-vendor/             model-viewer e decodificador meshopt
+vendor/             model-viewer, decodificador meshopt e fonte Doto, com as licenças
 assets/asx.glb      modelo 3D preto (CC-BY-4.0, ver asx-LICENSE.txt)
 src/obd.js          decodificador OBDb, ISO-TP, DTCs, ELM327 BLE, simulador
 src/mapa.js         mapa web do Google com trânsito, rota pela Routes API e entrega ao Vela
-src/painel.js       rotas das abas e leitura da manobra a partir da notificação
+src/painel.js       rotas das abas, manobra a partir da notificação e odômetro por GPS
 src/hudiy.js        cliente da API da central Hudiy (protobuf mínimo, mídia, navegação, OBD, teclas)
 src/signalset.js    sinais no formato OBDb v3
 sw.js               cache offline
@@ -143,4 +143,4 @@ tools/              central Hudiy falsa, capturas de tela, fluxo do mapa simulad
 docs/ESTADO.md      estado, decisões e pendências
 ```
 
-Créditos: tipografia Doto (Google Fonts), inspiração visual Nothing UI (Community, Zognest), dados OBD de OBDb, modelo 3D de mamont nikita (CC-BY-4.0).
+Créditos: tipografia Doto (The Doto Project Authors, OFL-1.1, em `vendor/`), inspiração visual Nothing UI (Community, Zognest), dados OBD de OBDb, modelo 3D de mamont nikita (CC-BY-4.0).
