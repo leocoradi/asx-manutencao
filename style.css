@@ -260,6 +260,7 @@ body[data-view=navegacao] .player { display: none; }
 /* Desktop */
 @media (min-width: 1100px) {
   body { grid-template-columns: 200px 1fr; }
+  .nav { align-items: stretch; padding: 24px 12px; } /* itens com a mesma largura: ícones e rótulos alinhados à esquerda */
   .nav a { flex-direction: row; gap: 10px; font-size: 14px; padding: 10px 14px; justify-content: flex-start; }
   .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .grid .span-2 { grid-column: span 2; }
