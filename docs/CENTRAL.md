@@ -97,6 +97,8 @@ Mudança central da arquitetura: **a interface web passa a ser embutida no APK**
 3. **UX automotiva:** novos tamanhos (76 dp, 32/24 dp), contraste, Início como painel de direção, bloqueio de formulários em movimento.
 4. **Multitarefa:** botão "Navegar" abrindo Waze ou Google Maps ao lado; indicadores de rede, áudio e OBD; avisos resumidos em movimento; botão flutuante "Voltar à central".
 
+Acréscimos vindos da avaliação do StradaOS (`docs/STRADAOS.md`), ainda não aprovados pelo dono: odômetro automático por GPS no serviço do modo carro (etapa 2); velocidade por GPS no painel de direção, sem depender do OBD (etapa 3); fileira de atalhos de apps e registro de falhas no aparelho (etapa 4).
+
 Cada etapa é um pull request com testes, capturas em 1333×800 (S6 Lite em paisagem) e APK pelo CI.
 
 ## Fontes

@@ -41,6 +41,7 @@ Web app (PWA) para acompanhar um Mitsubishi ASX 2017/2018 2.0 16V MIVEC 4x2 manu
 - **Waze removido**: sem API de rota; o usuário escolheu Vela como navegador. O mapa ao vivo do Waze foi substituído pelo Google com trânsito.
 - **Vela (github.com/PimpinPumpkin/Vela)**: app nativo Android, GPL-3; não embute em web. Registra `geo:`, `google.navigation:` e é app de navegação do Android Auto. Seu trânsito vem de endpoint não oficial do Google; **não replicar** isso aqui (CORS impede em web, viola termos, quebra sem aviso).
 - **Google Maps**: Directions API (legada) não pode ser ativada em projetos novos desde outubro de 2026; por isso a rota usa a Routes API. Cotas grátis mensais: 10 mil cargas de mapa, 5 mil rotas com trânsito. Exige conta de faturamento com cartão. Termos proíbem guiar curva a curva no app; por isso a condução vai para o Vela.
+- **StradaOS (github.com/lordnordic-debug/StradaOS)**: launcher GPL-3.0 para centrais Android antigas; sem OBD, rota, trânsito ou modo carro, e o "Android Auto" dele é projeção do celular. Não substitui o nosso caminho e o código não é reaproveitado; quatro ideias entram no roteiro (odômetro e velocidade por GPS, atalhos de apps, registro de falhas). Avaliação em `docs/STRADAOS.md`.
 - **Hudiy**: protobuf das poucas mensagens usadas é codificado à mão (`src/hudiy.js`) em vez de carregar protobuf.js e o `.proto`.
 - **Fonte Doto (Google Fonts)**: a mais próxima da NDot do Nothing UI disponível livremente.
 

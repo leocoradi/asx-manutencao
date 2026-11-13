@@ -1,6 +1,6 @@
 # Guia para agentes neste repositório
 
-Leia também `docs/ESTADO.md` (o que existe, decisões, pendências) e `docs/CENTRAL.md` (objetivo atual: central multimídia dedicada num tablet no painel, e a ordem de execução) antes de mudar qualquer coisa. `docs/PLANO.md` é histórico da fase em que o celular era a tela principal.
+Leia também `docs/ESTADO.md` (o que existe, decisões, pendências) e `docs/CENTRAL.md` (objetivo atual: central multimídia dedicada num tablet no painel, e a ordem de execução) antes de mudar qualquer coisa. `docs/STRADAOS.md` é a avaliação de um launcher de terceiros e das ideias aproveitadas dele. `docs/PLANO.md` é histórico da fase em que o celular era a tela principal.
 
 ## Regras do projeto
 
