@@ -1,4 +1,5 @@
 /* Nothing UI inspirado: fundo preto, cartões brancos, tipografia dot-matrix, tracejados, vermelho só para alerta. */
+@font-face { font-family: 'Doto'; font-weight: 500 900; font-display: swap; src: url(vendor/doto.woff2) format('woff2'); } /* subconjunto latino, OFL-1.1 */
 :root {
   --bg: #0a0a0a;
   --bg-2: #161616;
@@ -29,6 +30,7 @@ body {
 h1, h2, h3 { margin: 0; font-weight: 600; }
 .dot-title, .num, h1, h2 { font-family: var(--dot); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
 h1 { font-size: 26px; }
+.main > h1 { margin: 8px 0 12px; }
 h2 { font-size: 15px; color: var(--fg-dim); margin: 24px 0 10px; }
 .card h2 { color: var(--card-dim); margin: 0 0 10px; }
 .num { font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -40,12 +42,16 @@ small { font-size: 12px; }
 .brand { display: flex; flex-direction: column; }
 .brand .dot-title { font-size: 22px; }
 .brand .sub { font-size: 12px; color: var(--fg-dim); }
+.top-acoes { display: flex; gap: 6px; align-items: center; }
+#btn-carro[aria-pressed=true] { background: var(--fg); color: var(--bg); border-radius: 999px; }
 
 .nav { grid-area: nav; display: flex; justify-content: space-around; align-items: center; background: var(--bg); border-top: 1px dashed var(--line); padding: 0 4px env(safe-area-inset-bottom); height: calc(var(--nav-h) + env(safe-area-inset-bottom)); position: sticky; bottom: 0; z-index: 5; }
 .nav a { display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--fg-dim); text-decoration: none; font-size: 11px; padding: 6px 10px; border-radius: 14px; min-width: 56px; }
 .nav a svg, .icon-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .nav a[aria-current] { color: var(--fg); background: var(--bg-2); }
-.nav a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible { outline: 2px dashed var(--red); outline-offset: 2px; }
+button:focus-visible, a:focus-visible { outline: 2px dashed var(--red); outline-offset: 2px; }
+/* Campo de texto em foco: borda escura dentro do campo; o tracejado vermelho parecia erro ao digitar. */
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--card-fg); box-shadow: inset 0 0 0 1px var(--card-fg); }
 
 .main { grid-area: main; padding: 4px var(--pad) 24px; max-width: 1200px; width: 100%; margin: 0 auto; }
 .grid { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
@@ -59,8 +65,16 @@ small { font-size: 12px; }
 .card.alert { border: 2px solid var(--red); }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .stack { display: flex; flex-direction: column; gap: 4px; }
+.prox { width: 100%; background: none; color: inherit; padding: 10px 0; border-bottom: 1px dashed var(--card-line); border-radius: 0; text-align: left; }
+.prox .stack { flex: 1; }
 .big { font-size: 44px; line-height: 1; }
 .mid { font-size: 26px; line-height: 1.1; }
+/* Modo carro no Início: velocidade lida a 60–70 cm e atalhos com alvo de 76 px (diretriz para telas de carro). */
+.vel { font-size: 88px; line-height: 1; }
+.vel ~ h2 { margin-top: 14px; }
+.atalhos { display: flex; gap: 12px; flex-wrap: wrap; }
+.atalhos button { flex: 1 1 150px; min-height: 76px; border-radius: var(--r); background: var(--bg-2); color: var(--fg); border: 2px solid var(--line); display: inline-flex; align-items: center; justify-content: center; gap: 10px; font-size: 18px; }
+.atalhos svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 
 /* Barra segmentada estilo Nothing */
 .seg { display: flex; gap: 4px; margin-top: 8px; }
@@ -79,6 +93,7 @@ small { font-size: 12px; }
 .card.dark .chip.breve { color: var(--warn); }
 
 button, .btn { font: inherit; cursor: pointer; border: 0; border-radius: 999px; padding: 10px 16px; background: var(--card-fg); color: var(--card); font-weight: 600; min-height: 44px; }
+a.btn, label.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .btn-ghost { background: transparent; color: inherit; border: 1px dashed currentColor; }
 .btn-red { background: var(--red); color: #fff; }
 .btn-sm { min-height: 36px; padding: 6px 12px; font-size: 13px; }
@@ -113,9 +128,14 @@ dialog h2 { margin-top: 0; }
 .player { grid-area: player; background: var(--bg); border-top: 1px dashed var(--line); display: flex; flex-direction: column; min-width: 0; overflow: hidden; position: sticky; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom)); z-index: 4; }
 .player:empty { display: none; }
 .player .barra { display: flex; align-items: center; gap: 12px; padding: 8px var(--pad); min-height: 64px; min-width: 0; }
-.gmapa { width: 100%; aspect-ratio: 16 / 10; max-height: 360px; border-radius: 12px; overflow: hidden; background: var(--bg-2); }
-.alts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-.alts .chip { background: transparent; min-height: 0; cursor: pointer; }
+.alts { display: flex; gap: 6px; margin-top: 8px; overflow-x: auto; scrollbar-width: none; }
+.alt { flex: none; max-width: 240px; overflow: hidden; text-overflow: ellipsis; background: transparent; color: var(--fg-dim); border: 1px dashed var(--line); font-weight: 400; font-size: 13px; min-height: 36px; padding: 4px 12px; white-space: nowrap; }
+.alt[aria-pressed=true] { color: var(--fg); border: 1px solid var(--fg); }
+.rota-resumo { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.rr-texto { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+.rr-tempo { font-size: 20px; white-space: nowrap; }
+.rr-texto small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.rr-ir { flex: none; }
 .passos { margin-top: 8px; font-size: 14px; }
 .passos summary { cursor: pointer; color: var(--fg-dim); }
 .passos ol { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 6px; }
@@ -129,8 +149,6 @@ dialog h2 { margin-top: 0; }
 .ctl button.play { background: var(--fg); color: var(--bg); border: 0; }
 .ctl svg { width: 18px; height: 18px; fill: currentColor; }
 .claro { background: var(--fg); color: var(--bg); }
-.player .atalho { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; color: var(--fg); text-decoration: none; border: 1px dashed var(--line); border-radius: 999px; padding: 8px 14px; font-size: 14px; }
-.player .atalho i { width: 10px; height: 10px; border-radius: 50%; background: var(--red); display: inline-block; }
 .navcard { display: flex; align-items: center; gap: 14px; padding: 10px 14px; }
 .navcard img { width: 44px; height: 44px; object-fit: contain; flex: none; }
 .navcard img.inv { filter: invert(1); }
@@ -149,13 +167,17 @@ body[data-view=navegacao] { height: 100dvh; }
 body[data-view=navegacao] .main { min-height: 0; max-width: none; padding: 4px 10px 10px; display: flex; overflow: hidden; }
 body[data-view=navegacao] .player { display: none; }
 .nav-view { flex: 1; min-width: 0; min-height: 0; display: grid; gap: 10px; grid-template: "mapa" minmax(0, 1fr) "midia" auto "avisos" minmax(84px, 22dvh) / minmax(0, 1fr); }
-.mapa-area { grid-area: mapa; display: flex; flex-direction: column; gap: 8px; min-height: 0; min-width: 0; }
+.mapa-area { grid-area: mapa; display: flex; flex-direction: column; gap: 8px; min-height: 0; min-width: 0; position: relative; }
+/* Manobra no canto de cima e resumo da rota no canto de baixo, sobre o mapa (como no Android Auto). */
+.mapa-area .manobra-slot { position: absolute; top: 8px; left: 8px; right: 8px; z-index: 2; pointer-events: none; }
+.mapa-area .manobra-slot .navcard { pointer-events: auto; width: max-content; max-width: min(560px, 100%); box-shadow: 0 4px 16px rgba(0,0,0,.45); }
+.mapa-area .rota-info:not(:empty) { display: grid; gap: 6px; position: absolute; left: 8px; right: 8px; bottom: 60px; z-index: 2; max-width: 560px; max-height: 50%; overflow: auto;
+  background: var(--bg); border: 1px dashed var(--line); border-radius: var(--r); padding: 10px 12px; box-shadow: 0 4px 16px rgba(0,0,0,.45); }
 .mapa-box { flex: 1; min-height: 100px; border-radius: var(--r); overflow: hidden; background: var(--bg-2); border: 1px dashed var(--line); }
-.mapa-box.gmapa { aspect-ratio: auto; max-height: none; }
 .mapa-box.vazio { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 16px; }
 .destino { gap: 8px; }
 .destino input { min-width: 0; }
-.rota-info { max-height: 34%; overflow: auto; }
+.mapa-area .destino { flex: none; }
 .w-midia { grid-area: midia; min-width: 0; min-height: 0; display: grid; gap: 8px 12px; align-items: center; grid-template: "topo ctl" auto "prog prog" auto / minmax(0, 1fr) auto; padding: 12px 14px; }
 .wm-topo { grid-area: topo; display: flex; align-items: center; gap: 12px; min-width: 0; }
 .wm-prog { grid-area: prog; display: flex; align-items: center; gap: 10px; }
@@ -172,6 +194,11 @@ body[data-view=navegacao] .player { display: none; }
 .av-corpo .t { font-weight: 600; }
 .av-corpo .tx { font-size: 14px; color: var(--fg-dim); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .av-acoes { display: flex; gap: 6px; }
+@media (orientation: portrait) and (max-height: 600px) {
+  body[data-view=navegacao] .top { display: none; }
+  body[data-view=navegacao] .w-midia, body[data-view=navegacao] .w-avisos { display: none; }
+  .nav-view { grid-template: "mapa" minmax(0, 1fr) / minmax(0, 1fr); }
+}
 @media (orientation: landscape) and (min-width: 640px) {
   .nav-view { grid-template: "mapa midia" auto "mapa avisos" minmax(0, 1fr) / minmax(0, 2.2fr) minmax(220px, 1fr); }
   .w-midia { grid-template: "topo" auto "prog" auto "ctl" auto / minmax(0, 1fr); }
@@ -231,6 +258,7 @@ body[data-view=navegacao] .player { display: none; }
 /* Desktop */
 @media (min-width: 1100px) {
   body { grid-template-columns: 200px 1fr; }
+  .nav { align-items: stretch; padding: 24px 12px; } /* itens com a mesma largura: ícones e rótulos alinhados à esquerda */
   .nav a { flex-direction: row; gap: 10px; font-size: 14px; padding: 10px 14px; justify-content: flex-start; }
   .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .grid .span-2 { grid-column: span 2; }
@@ -250,7 +278,8 @@ body[data-view=navegacao] .player { display: none; }
   .nav a { flex-direction: column; padding: 6px 2px; font-size: 10px; gap: 1px; min-width: 0; border-radius: 10px; }
   .nav a svg { width: 20px; height: 20px; }
   .main { padding: 4px 20px 16px; }
-  h1 { font-size: 20px; margin: 2px 0 6px !important; }
+  h1 { font-size: 20px; }
+  .main h1 { margin: 2px 0 6px; }
   h2 { margin: 12px 0 6px; }
   .card { padding: 12px 14px; }
   .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-flow: dense; gap: 10px; }

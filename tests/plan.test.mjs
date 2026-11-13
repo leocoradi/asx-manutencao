@@ -55,3 +55,12 @@ test('consumo entre tanques cheios', () => {
   assert.equal(c.media, 10);
   assert.equal(consumo([]).media, null);
 });
+
+test('pneus entram no plano e são estimados pela quilometragem', () => {
+  const pneus = PLANO.find((p) => p.id === 'pneus');
+  assert.equal(pneus.area, 'rodas');
+  const s = situacao(pneus, [], 103250, hoje);
+  assert.equal(s.estimado, true); assert.equal(s.proximo, 150000); assert.equal(s.status, 'ok');
+  assert.equal(situacao(pneus, [], 147000, hoje).status, 'breve');
+  assert.equal(situacao(pneus, [{ data: '2026-01-10', km: 60000, itens: ['pneus'] }], 111000, hoje).status, 'vencido');
+});

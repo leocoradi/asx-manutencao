@@ -31,6 +31,8 @@ export const PLANO = [
     spec: 'OEM 7803A005.' },
   { id: 'rodizio', area: 'rodas', nome: 'Rodízio, alinhamento e balanceamento', km: 10000, meses: 12,
     spec: '225/55 R18 98V a 29 psi (2,0 bar) a frio. Estepe 215/70 R16 a 32 psi. Sulco mínimo 1,6 mm.' },
+  { id: 'pneus', area: 'rodas', nome: 'Troca dos pneus', km: 50000, meses: 60,
+    spec: '4x 225/55 R18 98V. O manual não fixa quilometragem: 50.000 km ou 5 anos é estimativa de vida útil. Trocar antes se o sulco chegar ao indicador TWI (1,6 mm) ou houver bolha, corte ou ressecamento. Data de fabricação (DOT) na lateral do pneu.' },
   { id: 'inspecao', area: 'freios', nome: 'Inspeção: freios, coifas, buchas, bieletas, correia', km: 10000, meses: 12,
     spec: 'Pastilhas/discos, coifas das homocinéticas, buchas de bandeja, bieletas, nível do óleo da caixa, correia Poly-V.' },
   { id: 'fluido-freio', area: 'freios', nome: 'Fluido de freio e embreagem (DOT 4)', km: 20000, meses: 12,

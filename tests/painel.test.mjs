@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { analisarHash, manobraDeNotificacao, mmss, tempoDistancia } from '../src/painel.js';
+import { analisarHash, manobraDeNotificacao, mmss, distanciaM, passoOdometro } from '../src/painel.js';
 
 test('rotas das abas e redirecionamento das antigas', () => {
   assert.deepEqual(analisarHash(''), { view: 'inicio', sub: '', qs: '', redirecionar: null });
@@ -30,6 +30,19 @@ test('manobra: distância no título, rua no texto', () => {
 
 test('formatação de tempo', () => {
   assert.equal(mmss(83000), '1:23');
-  assert.equal(tempoDistancia(754, 5230), '13 min · 5,2 km');
-  assert.equal(tempoDistancia(4000, 420), '1 h 7 min · 420 m');
+});
+
+test('odômetro pelo GPS: soma trechos válidos e descarta ruído, leitura ruim e salto', () => {
+  // 0,001° de latitude = 111,2 m
+  const p = (lat, t, precisao = 10) => ({ lat, lon: -46.6, t, precisao });
+  assert.ok(Math.abs(distanciaM(p(-23.5, 0), p(-23.501, 0)) - 111.2) < 0.5);
+  const a = p(-23.5, 0);
+  assert.deepEqual(passoOdometro(null, a), { ref: a, metros: 0 });                     // primeira leitura só marca o ponto
+  assert.deepEqual(passoOdometro(null, p(-23.5, 0, 80)), { ref: null, metros: 0 });    // imprecisa: nem vira referência
+  assert.deepEqual(passoOdometro(a, p(-23.5, 0, undefined)), { ref: a, metros: 0 });   // sem precisão informada
+  assert.deepEqual(passoOdometro(a, p(-23.5001, 5000)), { ref: a, metros: 0 });        // 11 m: ruído parado
+  const b = p(-23.501, 5000), r = passoOdometro(a, b);                                 // 111 m em 5 s (80 km/h)
+  assert.equal(r.ref, b); assert.ok(Math.abs(r.metros - 111.2) < 0.5);
+  const longe = p(-23.6, 6000);                                                        // 11 km em 1 s: salto
+  assert.deepEqual(passoOdometro(b, longe), { ref: longe, metros: 0 });
 });

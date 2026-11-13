@@ -3,3 +3,4 @@ shots/
 .DS_Store
 asx-backup-*.json
 package-lock.json
+android/app/src/main/assets/www/

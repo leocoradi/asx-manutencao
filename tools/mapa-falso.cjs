@@ -32,6 +32,6 @@ const out = process.argv[2] || 'shots';
   await p.click('[data-action="rota-alt"][data-i="1"]'); await p.waitForTimeout(200);
   await p.click('.passos summary'); await p.waitForTimeout(200);
   await p.screenshot({ path: `${out}/mapa-rota.png`, clip: { x: 0, y: 90, width: 390, height: 750 } });
-  console.log(await p.evaluate(() => ({ vela: document.querySelector('.rota-info a')?.getAttribute('href'), alternativas: document.querySelectorAll('.alts .chip').length, tempo: document.querySelector('.rota-info .num')?.textContent })));
+  console.log(await p.evaluate(() => ({ vela: document.querySelector('.rota-info a')?.getAttribute('href'), alternativas: document.querySelectorAll('.alts .alt').length, tempo: document.querySelector('.rr-tempo')?.textContent })));
   await b.close();
 })();

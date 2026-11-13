@@ -5,7 +5,7 @@ Web app (PWA) para acompanhar o Mitsubishi ASX 2017/2018 2.0 16V MIVEC 4x2, câm
 ## O que tem
 
 - **Início**: odômetro, carro 3D com estado por área (motor, câmbio, freios, rodas, elétrica), próximas manutenções, consumo e, com navegação ativa, uma faixa de manobra que leva à aba Navegação.
-- **Navegação**: mapa na área principal, widget de mídia e central de avisos. Em paisagem os widgets empilham à direita do mapa; em retrato, abaixo. O mapa é o **Google Navigation SDK** nativo no APK compilado com chave (guia curva a curva com voz, faixas e trânsito). Sem essa chave, ou no navegador, é o mapa web do Google com trânsito e rota pela Routes API, com o botão **Navegar no Vela**.
+- **Navegação**: mapa web do Google com trânsito ao vivo e rota (chave sua, abaixo), widget de mídia e central de avisos. Em paisagem os widgets empilham à direita do mapa; em retrato, abaixo. Guia curva a curva é com o Vela, Waze ou Google Maps; a manobra deles aparece no card sobre o mapa.
 - **Manutenção**, com três subseções: **Plano** (preventivo em uso severo, km ou meses, com especificações, part numbers e histórico), **Ficha** (motor, fluidos, pneus, lâmpadas, velas, fusíveis) e **OBD** (leitura ao vivo via ELM327 Bluetooth LE, códigos de falha, odômetro e contador de revisão do painel, com simulador).
 - **Combustível**: registro de abastecimentos, km/L por tanque cheio, média e custo por km.
 - **Mídia (no APK)**: rodapé em todas as abas e widget na Navegação com o que o celular está tocando (YouTube Music, Spotify…): capa, faixa, artista, progresso e anterior / play-pause / próxima.
@@ -38,30 +38,34 @@ No Android (Chrome): abrir a URL → menu → *Instalar app*.
 
 ## App Android (APK)
 
-O APK é uma casca fina em Kotlin (`android/`): uma WebView com o app publicado mais o que o navegador não consegue fazer:
+O APK é a central do carro num tablet (pensado para o Galaxy Tab S6 Lite no painel), em Kotlin (`android/`): uma WebView com a interface **embutida no APK** mais o que o navegador não consegue fazer. Fora do carro o tablet continua normal; a central só assume a tela no modo carro.
 
-- **Sessão de mídia**: lê o que está tocando no celular e manda os controles (`MediaSessionManager`).
+- **Interface embutida**: os arquivos do site vão dentro do APK e são servidos no mesmo endereço do GitHub Pages, então a central abre sem internet e os registros já gravados no aparelho continuam valendo.
+- **Modo carro**: liga quando o tablet conecta ao áudio Bluetooth do carro escolhido (ou pelo botão do carro no topo) e desliga quando desconecta. No modo carro: paisagem, tela cheia, tela sempre acesa e Voltar não fecha o app. Fora dele, o ASX é um app comum.
+- **Início no modo carro**: velocidade pelo GPS do tablet; **odômetro automático**, que soma a distância percorrida ao último valor digitado (o Início mostra quantos km vieram do GPS, e um abastecimento ou "Atualizar" com a leitura do painel corrige o desvio); e **atalhos** para os apps instalados entre Waze, Google Maps, Vela, YouTube Music e Android Auto. Os de navegação abrem em tela dividida, ao lado da central. O odômetro só conta com a central na tela (inteira ou dividida).
+- **Sessão de mídia**: lê o que está tocando no tablet e manda os controles (`MediaSessionManager`).
 - **Notificações**: manobra do Vela, Google Maps ou Waze e central de avisos (`NotificationListenerService`), só em memória.
-- **Mapa nativo**: `NavigationView` do Google Navigation SDK posicionada sobre a WebView, no retângulo do mapa da aba Navegação.
-- **Intents e sistema**: links externos abrem os apps do Android; barras do sistema viram margem e somem em paisagem; geolocalização pede a permissão do sistema.
+- **Sistema**: links externos abrem os apps do Android; barras do sistema viram margem; se o processo de desenho da WebView morrer, ela é recriada; pedido de isenção de otimização de bateria.
 
 Instalação: baixe `asx-manutencao.apk`, instale (permitir fontes desconhecidas) e, no rodapé, toque em **Permitir** para dar "Acesso a notificações" ao app. Sem isso, mídia, manobras e avisos não aparecem.
 
-Onde baixar: sem a chave do Google, no artefato do workflow **Android** (aba Actions). Com a chave, em **Releases**, no rascunho "APK com mapa nativo (privado)", visível só para quem tem acesso de escrita ao repositório. O APK com chave não vai para o artefato porque artefatos de repositório público podem ser baixados por qualquer conta do GitHub.
+Onde baixar: em **Releases**, na versão mais nova ("App 1.N"). Cada build do `main` que mexe em `android/` ou nos arquivos do site publica uma.
 
-### Mapa nativo (Navigation SDK)
+### Preparar o tablet para o carro
 
-1. No [Google Cloud](https://console.cloud.google.com), no mesmo projeto, ative a API **Navigation SDK**.
-2. Crie uma **segunda chave de API** só para o app Android, com restrição de API apenas ao Navigation SDK. A chave do mapa web é restrita por site e não serve aqui.
-3. Em *APIs e serviços → Navigation SDK → Cotas*, limite os pedidos por dia (30 por dia mantém o mês abaixo dos 1.000 destinos gratuitos). Crie também um alerta de orçamento.
-4. No GitHub: *Settings → Secrets and variables → Actions → New repository secret*, nome `MAPS_API_KEY`, valor a chave.
-5. Rode o workflow **Android**. O APK sai no rascunho de release.
+1. **Escolher o carro**: conecte o tablet ao Bluetooth do rádio do ASX, abra a engrenagem → **Modo carro** → **Usar "<nome>" como o carro**. Daí em diante o modo carro liga sozinho quando esse Bluetooth conecta.
+2. **Bateria**: na mesma seção, **Liberar uso de bateria**. Em *Configurações → Bateria → Limites de uso em segundo plano*, coloque ASX, Waze e YouTube Music em **Apps nunca suspensos**. Ligue **Proteger bateria** (carga até 85%) por causa do calor no painel.
+3. **Abrir sozinho** (opcional): em *Configurações → Modos e rotinas → Rotinas → +*, condição **Dispositivo Bluetooth conectado** (o rádio do carro), ações **Abrir app** (ASX), **Não perturbar** e **Tempo limite da tela** no máximo. Ao desconectar, a rotina desfaz os ajustes. Há relatos de ajustes que não voltam; confira no tablet e, se preciso, adicione ações de término.
+4. **Sem bloqueio no carro** (opcional): *Configurações → Tela de bloqueio → Smart Lock → Dispositivos confiáveis*, adicione o Bluetooth do rádio. Em casa o bloqueio continua.
+5. **Android Auto no tablet** (opcional): instale o [Open Headunit](https://github.com/andreknieriem/open-headunit) (app separado, AGPL-3.0, não certificado pelo Google). O atalho **Android Auto** aparece no Início do modo carro e abre esse app, que recebe a projeção do celular por cabo USB ou Wi-Fi, ou roda o Android Auto do próprio tablet ("self mode", depende de o Android Auto instalar no tablet). A configuração é feita dentro do Open Headunit.
 
-Uso: na aba Navegação, digite o destino e toque em **Ir**. Na primeira vez o Google mostra os termos de uso. O endereço vira coordenada pelo Geocoder do Android, sem custo; cada destino pedido conta 1 na cota do Navigation SDK.
+### Atualizar
 
-Assinatura: sem keystore próprio, cada build é assinado com uma chave de debug nova e atualizar exige desinstalar antes (os registros ficam no app; exporte o backup). Para assinatura estável e para poder restringir a chave do Google ao pacote `br.asx.manutencao`, cadastre os secrets `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_SENHA`, `ANDROID_CHAVE` e `ANDROID_CHAVE_SENHA`.
-
-Numa central multimídia Android, instale o APK e defina como tela inicial.
+- **Interface e APK** vêm juntos: a interface está embutida, então qualquer mudança chega pela versão nova do APK.
+- Engrenagem → **Procurar atualização**. O app consulta a release mais nova; se houver, mostra **Baixar e instalar**, baixa o APK e o Android pede confirmação. Na primeira vez o Android pede para permitir "Instalar apps desconhecidos" para o ASX.
+- Todos os APKs são assinados pela mesma chave, guardada pelo CI num **rascunho de release "assinatura"**. Não apague nem publique esse rascunho: sem ele, o app instalado deixa de aceitar atualizações.
+- APKs instalados antes da versão com o botão foram assinados com chaves descartáveis. Para a primeira instalação com a chave fixa: exporte o backup, desinstale o app antigo, instale o novo e importe o backup. Daí em diante, o botão resolve.
+- No navegador (GitHub Pages), a página se atualiza sozinha.
 
 ## Chave do Google Maps para o mapa web
 
@@ -115,7 +119,7 @@ Visualizador: `<model-viewer>` 4.7 (Google, Apache-2.0) e o decodificador meshop
 
 ## Continuidade
 
-`CLAUDE.md` tem as regras do projeto para agentes e `docs/ESTADO.md` tem o estado, as decisões e as pendências. Scripts de verificação em `tools/` (Playwright e `ws` como devDependencies: `npm i`).
+`CLAUDE.md` tem as regras do projeto para agentes e `docs/ESTADO.md` tem o estado, as decisões e as pendências; `docs/SEGURANCA.md` tem a varredura de segurança. Scripts de verificação em `tools/` (Playwright e `ws` como devDependencies: `npm i`).
 
 ## Estrutura
 
@@ -126,11 +130,12 @@ src/app.js          estado, rotas, telas, formulários, backup
 src/data.js         base técnica do veículo e plano de manutenção
 src/plan.js         vencimentos e consumo
 src/car.js          modelo 3D e silhueta SVG com pontos de atenção
-vendor/             model-viewer e decodificador meshopt
+vendor/             model-viewer, decodificador meshopt e fonte Doto, com as licenças
 assets/asx.glb      modelo 3D preto (CC-BY-4.0, ver asx-LICENSE.txt)
 src/obd.js          decodificador OBDb, ISO-TP, DTCs, ELM327 BLE, simulador
 src/mapa.js         mapa web do Google com trânsito, rota pela Routes API e entrega ao Vela
-src/painel.js       rotas das abas e leitura da manobra a partir da notificação
+src/painel.js       rotas das abas, manobra a partir da notificação e odômetro por GPS
+src/dados.js        formato e validação dos registros (localStorage e backup)
 src/hudiy.js        cliente da API da central Hudiy (protobuf mínimo, mídia, navegação, OBD, teclas)
 src/signalset.js    sinais no formato OBDb v3
 sw.js               cache offline
@@ -139,4 +144,4 @@ tools/              central Hudiy falsa, capturas de tela, fluxo do mapa simulad
 docs/ESTADO.md      estado, decisões e pendências
 ```
 
-Créditos: tipografia Doto (Google Fonts), inspiração visual Nothing UI (Community, Zognest), dados OBD de OBDb, modelo 3D de mamont nikita (CC-BY-4.0).
+Créditos: tipografia Doto (The Doto Project Authors, OFL-1.1, em `vendor/`), inspiração visual Nothing UI (Community, Zognest), dados OBD de OBDb, modelo 3D de mamont nikita (CC-BY-4.0).

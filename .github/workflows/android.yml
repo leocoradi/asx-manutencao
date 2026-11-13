@@ -2,51 +2,57 @@ name: Android
 on:
   push:
     branches: [main]
-    paths: ['android/**', '.github/workflows/android.yml']
-    tags: ['v*']
+    # A interface vai embutida no APK: mudanças na web também geram APK novo.
+    paths: ['android/**', '.github/workflows/android.yml', 'index.html', 'style.css', 'manifest.webmanifest', 'src/**', 'vendor/**', 'assets/**']
   workflow_dispatch:
 permissions:
   contents: write
 jobs:
   apk:
     runs-on: ubuntu-latest
-    env:
-      TEM_CHAVE: ${{ secrets.MAPS_API_KEY != '' && 'sim' || 'nao' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      # Ações fixadas por commit: este workflow tem a chave que assina o APK e permissão de publicar releases.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with: { distribution: temurin, java-version: '17' }
       # O runner ubuntu-latest já tem o SDK em $ANDROID_HOME; o AGP baixa platform e build-tools que faltarem.
       - run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
         with: { gradle-version: '9.4.1' }
-      # Assinatura estável (opcional): secrets ANDROID_KEYSTORE_B64, ANDROID_KEYSTORE_SENHA, ANDROID_CHAVE, ANDROID_CHAVE_SENHA.
-      # Sem eles o APK sai com a chave de debug do runner e atualizar exige desinstalar.
-      - name: Keystore
-        env: { KS: '${{ secrets.ANDROID_KEYSTORE_B64 }}' }
-        if: env.KS != ''
+      # Assinatura fixa: o Android só aceita atualizar um app com APK assinado pela mesma chave.
+      # A chave é gerada no primeiro build e guardada num rascunho de release "assinatura", que só
+      # quem tem escrita no repositório vê. Não apague nem publique esse rascunho: sem ele, o app
+      # instalado deixa de aceitar atualizações e é preciso desinstalar uma vez.
+      - name: Assinatura
+        env: { GH_TOKEN: '${{ github.token }}', SENHA: asx-manutencao }
         run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > "$RUNNER_TEMP/asx.jks"
-          echo "ASX_KEYSTORE=$RUNNER_TEMP/asx.jks" >> "$GITHUB_ENV"
-          echo "ASX_KEYSTORE_SENHA=${{ secrets.ANDROID_KEYSTORE_SENHA }}" >> "$GITHUB_ENV"
-          echo "ASX_CHAVE=${{ secrets.ANDROID_CHAVE }}" >> "$GITHUB_ENV"
-          echo "ASX_CHAVE_SENHA=${{ secrets.ANDROID_CHAVE_SENHA }}" >> "$GITHUB_ENV"
-      # MAPS_API_KEY (opcional): chave do Google com o Navigation SDK ativado. Com ela o APK traz o mapa nativo.
+          R="$GITHUB_REPOSITORY"; K="$RUNNER_TEMP/assinatura.p12"
+          if gh release download assinatura -p assinatura.p12 -D "$RUNNER_TEMP" --repo "$R"; then
+            echo "Chave de assinatura recuperada."
+          elif gh release list --repo "$R" --json tagName -q '.[].tagName' | grep -qx assinatura; then
+            echo "::error::O rascunho 'assinatura' existe, mas a chave não foi baixada. Nenhuma chave nova foi criada."; exit 1
+          else
+            keytool -genkeypair -keystore "$K" -storetype PKCS12 -alias asx -keyalg RSA -keysize 4096 -validity 36500 \
+              -storepass "$SENHA" -keypass "$SENHA" -dname "CN=ASX Manutencao"
+            gh release create assinatura "$K" --draft --repo "$R" --title "Assinatura do APK (não apagar, não publicar)" \
+              --notes "Chave que assina todos os APKs. Apagar ou publicar este rascunho quebra as atualizações do app instalado."
+          fi
+          { echo "ASX_KEYSTORE=$K"; echo "ASX_KEYSTORE_SENHA=$SENHA"; echo "ASX_CHAVE=asx"; echo "ASX_CHAVE_SENHA=$SENHA"; } >> "$GITHUB_ENV"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: 22 }
+      - run: npm test
+      # Interface embutida: os mesmos arquivos do site vão para assets/www do APK.
+      - run: |
+          D=android/app/src/main/assets/www; rm -rf "$D"; mkdir -p "$D"
+          cp -r index.html style.css manifest.webmanifest src vendor assets "$D"/
       - run: gradle -p android assembleRelease --no-daemon
-        env: { MAPS_API_KEY: '${{ secrets.MAPS_API_KEY }}' }
       - run: cp android/app/build/outputs/apk/release/app-release.apk asx-manutencao.apk
-      # Sem chave embutida o APK é público como artefato. Com chave, vai para um rascunho de release,
-      # que só quem tem acesso de escrita ao repositório consegue baixar.
-      - uses: actions/upload-artifact@v4
-        if: env.TEM_CHAVE != 'sim'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with: { name: asx-manutencao-apk, path: asx-manutencao.apk }
-      - name: APK com chave em rascunho de release
-        if: env.TEM_CHAVE == 'sim'
+      # Builds do main viram a release mais nova, que o botão "Procurar atualização" do app baixa.
+      - name: Publicar versão
+        if: github.ref == 'refs/heads/main'
         env: { GH_TOKEN: '${{ github.token }}' }
         run: |
-          gh release delete apk-privado --yes --repo "$GITHUB_REPOSITORY" || true
-          gh release create apk-privado asx-manutencao.apk --draft --repo "$GITHUB_REPOSITORY" \
-            --title "APK com mapa nativo (privado)" --notes "Gerado em $(date -u +%F) do commit $GITHUB_SHA. Contém a chave do Google: não publique este rascunho."
-      - uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/v') && env.TEM_CHAVE != 'sim'
-        with: { files: asx-manutencao.apk }
+          gh release create "apk-$GITHUB_RUN_NUMBER" asx-manutencao.apk --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --latest --title "App 1.$GITHUB_RUN_NUMBER" --notes "$(git log -1 --format=%s)"

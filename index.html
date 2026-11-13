@@ -6,11 +6,12 @@
 <title>ASX · Manutenção</title>
 <meta name="description" content="Acompanhamento de manutenção, abastecimento e diagnóstico OBD do Mitsubishi ASX 2017/2018 2.0 4x2 manual.">
 <meta name="theme-color" content="#0a0a0a">
+<!-- Política de conteúdo: só scripts do app e do Google Maps rodam; script em linha e atributos on* ficam bloqueados.
+     Os domínios do Google são os da documentação do Maps JavaScript API; ws://localhost é a API da central Hudiy. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://*.googleapis.com https://*.gstatic.com *.google.com https://*.ggpht.com *.googleusercontent.com blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com *.google.com *.googleusercontent.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' data: blob: https://*.googleapis.com *.google.com https://*.gstatic.com ws://localhost:44406; frame-src *.google.com; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/icon-512.png">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Doto:wght@500..900&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -20,9 +21,14 @@
     <span class="dot-title">ASX 2.0</span>
     <span class="sub">4x2 · manual 5M · 2017/2018</span>
   </div>
+  <div class="top-acoes">
+  <button class="icon-btn" id="btn-carro" hidden aria-pressed="false" aria-label="Entrar no modo carro" data-action="carro">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 17h14M6 17v2M18 17v2M4 13l2-6h12l2 6v4H4zM4 13h16M7.5 15h.01M16.5 15h.01"/></svg>
+  </button>
   <button class="icon-btn" id="btn-config" aria-label="Backup e configurações">
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
   </button>
+  </div>
 </header>
 
 <nav class="nav" aria-label="Seções">

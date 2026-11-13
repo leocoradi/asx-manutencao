@@ -27,12 +27,22 @@ export function manobraDeNotificacao(n) {
   return { distancia, descricao, fonte: [n.app, extra, n.sub].filter(Boolean).join(' · ') };
 }
 
-export const mmss = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
-
-// 754 s, 5230 m -> "13 min · 5,2 km"
-export function tempoDistancia(segundos, metros) {
-  const min = Math.max(1, Math.round(segundos / 60));
-  const t = min >= 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min`;
-  const d = metros >= 1000 ? `${(metros / 1000).toFixed(1).replace('.', ',')} km` : `${Math.round(metros / 10) * 10} m`;
-  return `${t} · ${d}`;
+// Distância em metros entre dois pontos { lat, lon } (haversine).
+export function distanciaM(a, b) {
+  const rad = (g) => (g * Math.PI) / 180, R = 6371000;
+  const h = Math.sin(rad(b.lat - a.lat) / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lon - a.lon) / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
 }
+
+// Odômetro pelo GPS: ref é o último ponto aceito, atual é { lat, lon, t (ms), precisao (m) }.
+// Devolve { ref, metros }: o ponto de referência para a próxima leitura e quanto somar agora.
+export function passoOdometro(ref, atual) {
+  if (!(atual.precisao <= 40)) return { ref, metros: 0 };            // leitura imprecisa: ignora
+  if (!ref) return { ref: atual, metros: 0 };
+  const d = distanciaM(ref, atual);
+  if (d < 20) return { ref, metros: 0 };                              // ruído do GPS com o carro parado
+  if (d / Math.max(1, (atual.t - ref.t) / 1000) > 70) return { ref: atual, metros: 0 }; // salto acima de 250 km/h
+  return { ref: atual, metros: d };
+}
+
+export const mmss = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
