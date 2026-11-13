@@ -5,27 +5,27 @@ import { Elm327Ble, HudiyObd, Simulador, COMANDOS } from './obd.js';
 import { Hudiy, MSG, TECLA, mediaStatus, mediaMeta, navStatus, navDetalhes, navDistancia, imagemUrl } from './hudiy.js';
 import { carregarGoogle, MapaTransito, linksNavegar } from './mapa.js';
 import { analisarHash, manobraDeNotificacao, mmss, passoOdometro } from './painel.js';
+import { hojeIso, vazio, validar } from './dados.js';
 
 // --- Estado e persistência (localStorage + backup JSON) ---
 const KEY = 'asx.v1';
-const hojeIso = () => new Date().toISOString().slice(0, 10);
-const vazio = () => ({ v: 1, odo: { km: 0, data: hojeIso() }, log: [], fuel: [] });
-
-function validar(d) {
-  if (!d || typeof d !== 'object' || !Array.isArray(d.log) || !Array.isArray(d.fuel)) throw new Error('Arquivo não é um backup do app.');
-  const num = (n) => (Number.isFinite(+n) && +n >= 0 ? +n : 0);
-  const data = (s) => (/^\d{4}-\d{2}-\d{2}$/.test(s) ? s : hojeIso());
-  return {
-    v: 1,
-    odo: { km: num(d.odo?.km), data: data(d.odo?.data), gps: num(d.odo?.gps), m: num(d.odo?.m) }, // gps: km somados pelo GPS desde a última leitura digitada; m: resto em metros
-    log: d.log.map((e) => ({ id: String(e.id ?? crypto.randomUUID()), data: data(e.data), km: num(e.km), custo: num(e.custo), obs: String(e.obs ?? '').slice(0, 500),
-      itens: (Array.isArray(e.itens) ? e.itens : []).filter((i) => PLANO.some((p) => p.id === i)) })),
-    fuel: d.fuel.map((f) => ({ id: String(f.id ?? crypto.randomUUID()), data: data(f.data), km: num(f.km), litros: num(f.litros), valor: num(f.valor), cheio: !!f.cheio })),
-  };
+// O localStorage pode estar bloqueado ou cheio: o app abre e continua, e avisa quando não consegue gravar.
+const guardado = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+const guardar = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch { return false; } };
+function carregar() {
+  const bruto = guardado(KEY);
+  if (!bruto) return vazio();
+  try { return validar(JSON.parse(bruto)); } catch {
+    guardar(`${KEY}.ilegivel`, bruto); // cópia para recuperação manual, antes que o próximo salvar() substitua o dado
+    return vazio();
+  }
 }
-function carregar() { try { return validar(JSON.parse(localStorage.getItem(KEY))); } catch { return vazio(); } }
 let S = carregar();
-const salvar = () => localStorage.setItem(KEY, JSON.stringify(S));
+function salvar() {
+  if (!guardar(KEY, JSON.stringify(S))) toast('Não foi possível gravar neste aparelho (armazenamento cheio ou bloqueado). Exporte um backup.');
+}
+// Outra aba ou janela do app gravou: recarrega, para uma não apagar o registro da outra.
+window.addEventListener('storage', (e) => { if (e.key === KEY) { S = carregar(); render(); } });
 
 // --- Utilidades ---
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -150,7 +150,7 @@ function manutencao(q, sub) {
 }
 
 function plano(q) {
-  const area = q.get('area');
+  const area = Object.hasOwn(AREAS, q.get('area') ?? '') ? q.get('area') : null;
   const lista = ordenar(PLANO, S.log, S.odo.km).filter((l) => !area || l.item.area === area);
   const hist = [...S.log].sort((a, b) => b.km - a.km || b.data.localeCompare(a.data));
   const nome = (id) => PLANO.find((p) => p.id === id)?.nome ?? id;
@@ -180,7 +180,7 @@ function plano(q) {
       <div>
         <div class="stack"><span class="t">${e.itens.map((i) => esc(nome(i))).join(', ') || 'Serviço'}</span>
           <span class="d">${dataBr(e.data)} · ${km(e.km)} km${e.custo ? ` · ${brl(e.custo)}` : ''}${e.obs ? ` · ${esc(e.obs)}` : ''}</span></div>
-        <button class="btn-ghost btn-sm" data-action="apagar-log" data-id="${e.id}" aria-label="Apagar registro de ${dataBr(e.data)}">Apagar</button>
+        <button class="btn-ghost btn-sm" data-action="apagar-log" data-id="${esc(e.id)}" aria-label="Apagar registro de ${dataBr(e.data)}">Apagar</button>
       </div>`).join('') : '<div class="empty">Nenhum serviço registrado.</div>'}
   </div>`;
 }
@@ -201,7 +201,7 @@ function combustivel() {
       <form data-form="fuel">
         <div class="grid-2">
           <label>Data<input name="data" type="date" required value="${hojeIso()}"></label>
-          <label>Odômetro (km)<input name="km" type="number" inputmode="numeric" min="0" step="1" required value="${S.odo.km || ''}"></label>
+          <label>Odômetro (km)<input name="km" type="number" inputmode="numeric" min="0" max="2000000" step="1" required value="${S.odo.km || ''}"></label>
           <label>Litros<input name="litros" type="number" inputmode="decimal" min="0.1" step="0.01" required></label>
           <label>Valor total (R$)<input name="valor" type="number" inputmode="decimal" min="0" step="0.01" required></label>
         </div>
@@ -225,7 +225,7 @@ function combustivel() {
       <div>
         <div class="stack"><span class="t">${f.litros.toLocaleString('pt-BR')} L · ${brl(f.valor)}${f.cheio ? '' : ' · parcial'}</span>
           <span class="d">${dataBr(f.data)} · ${km(f.km)} km · ${brl(f.valor / f.litros)}/L</span></div>
-        <button class="btn-ghost btn-sm" data-action="apagar-fuel" data-id="${f.id}" aria-label="Apagar abastecimento de ${dataBr(f.data)}">Apagar</button>
+        <button class="btn-ghost btn-sm" data-action="apagar-fuel" data-id="${esc(f.id)}" aria-label="Apagar abastecimento de ${dataBr(f.data)}">Apagar</button>
       </div>`).join('') : '<div class="empty">Nenhum abastecimento registrado.</div>'}
   </div>`;
 }
@@ -317,7 +317,7 @@ function dlgRegistrar(itemId) {
   <form data-form="log">
     <div class="grid-2">
       <label>Data<input name="data" type="date" required value="${hojeIso()}"></label>
-      <label>Odômetro (km)<input name="km" type="number" inputmode="numeric" min="0" step="1" required value="${S.odo.km || ''}"></label>
+      <label>Odômetro (km)<input name="km" type="number" inputmode="numeric" min="0" max="2000000" step="1" required value="${S.odo.km || ''}"></label>
     </div>
     <fieldset><legend>Itens feitos</legend>
       ${PLANO.map((p) => `<label class="inline"><input type="checkbox" name="itens" value="${p.id}" ${p.id === itemId ? 'checked' : ''}>${esc(p.nome)}</label>`).join('')}
@@ -332,7 +332,7 @@ function dlgRegistrar(itemId) {
 function dlgKm() {
   abrir(`<h2>Odômetro</h2>
   <form data-form="km">
-    <label>Quilometragem atual<input name="km" type="number" inputmode="numeric" min="${S.odo.km - (S.odo.gps || 0)}" step="1" required value="${S.odo.km || ''}" autofocus></label>
+    <label>Quilometragem atual<input name="km" type="number" inputmode="numeric" min="0" max="2000000" step="1" required value="${S.odo.km || ''}" autofocus></label>
     <div class="actions"><button type="submit">Salvar</button><button type="button" class="btn-ghost" data-action="fechar">Cancelar</button></div>
   </form>`);
 }
@@ -400,6 +400,7 @@ function exportar() {
 }
 async function importar(file) {
   try {
+    if (file.size > 5e6) throw new Error('Arquivo grande demais para ser um backup do app.');
     const d = validar(JSON.parse(await file.text()));
     if (!confirm(`Substituir os dados atuais por ${d.log.length} serviços e ${d.fuel.length} abastecimentos?`)) return;
     S = d; salvar(); dlg.close(); render(); toast('Backup importado.');
@@ -434,9 +435,11 @@ document.addEventListener('submit', (e) => {
     gm.mapa.rota(pos, d.destino).then((r) => { gm.resumo = r; rotaAtualizar(); }).catch((e) => toast('Rota: ' + (e.message || e)));
     return;
   } else if (f.dataset.form === 'gm') {
-    gm.chave = d.chave; if (gm.chave) localStorage.setItem('asx.gmaps', gm.chave); else localStorage.removeItem('asx.gmaps');
+    gm.chave = d.chave; guardar('asx.gmaps', gm.chave || null);
     dlg.close(); render(); return;
   } else if (f.dataset.form === 'km') {
+    // Para baixo também (corrige um erro de digitação), mas só com confirmação.
+    if (d.km < S.odo.km && !confirm(`O odômetro atual é ${km(S.odo.km)} km. Corrigir para ${km(d.km)} km?`)) return;
     S.odo = { km: d.km, data: hojeIso() }; toast('Odômetro atualizado.');
   }
   salvar(); if (dlg.open) dlg.close(); render();
@@ -474,7 +477,11 @@ document.addEventListener('click', (e) => {
   else if (a === 'obd-sim') obdConectar(new Simulador());
   else if (a === 'obd-off') obdDesconectar();
   else if (a === 'obd-dtc') obd.tx.dtcs().then((d) => { obd.dtcs = d; logObd(`DTCs: ${d.join(', ') || 'nenhum'}`); render(); }).catch((err) => toast(err.message));
-  else if (a === 'obd-odo') { S.odo = { km: Math.round(obd.valores.ASX_ODO), data: hojeIso() }; salvar(); toast('Odômetro sincronizado.'); }
+  else if (a === 'obd-odo') {
+    const lido = Math.round(obd.valores.ASX_ODO); // vem do adaptador: só entra se for uma quilometragem plausível
+    if (!(lido > 0 && lido <= 2e6)) return toast('Leitura do odômetro fora do esperado.');
+    S.odo = { km: lido, data: hojeIso() }; salvar(); toast('Odômetro sincronizado.');
+  }
 });
 document.getElementById('btn-config').addEventListener('click', dlgConfig);
 main.addEventListener('click', (e) => { const h = e.target.closest('.hot, .hot3d'); if (h) location.hash = `#/manutencao?area=${h.dataset.area}`; });
@@ -516,7 +523,7 @@ function conectarCentral() { return central.conectar().then(() => { renderPlayer
 function manobraHtml() {
   if (!nav.ativo) return '';
   return `<div class="card navcard">
-    ${nav.iconeUrl ? `<img class="${nav.inverter ? 'inv' : ''}" src="${nav.iconeUrl}" alt="">` : ''}
+    ${nav.iconeUrl ? `<img class="${nav.inverter ? 'inv' : ''}" src="${esc(nav.iconeUrl)}" alt="">` : ''}
     <div class="stack" style="flex:1;min-width:0">${nav.distancia ? `<div class="num dist">${esc(nav.distancia)}</div>` : ''}<div class="desc">${esc(nav.descricao || 'Navegando')}</div><small class="muted">${esc(nav.fonte || 'Navegação')}</small></div></div>`;
 }
 // No Início: faixa compacta que leva à aba Navegação.
@@ -542,12 +549,12 @@ function iconeClaro(url) {
 }
 
 // --- Posição (mapa de trânsito) ---
-let pos = (() => { try { const p = JSON.parse(localStorage.getItem('asx.pos')); return Number.isFinite(p?.lat) && Number.isFinite(p?.lon) ? p : null; } catch { return null; } })();
+let pos = (() => { try { const p = JSON.parse(guardado('asx.pos')); return Number.isFinite(p?.lat) && Number.isFinite(p?.lon) ? p : null; } catch { return null; } })();
 function localizar(pedido) {
   if (!navigator.geolocation) return toast('Sem geolocalização neste navegador.');
   navigator.geolocation.getCurrentPosition((g) => {
     pos = { lat: g.coords.latitude, lon: g.coords.longitude };
-    localStorage.setItem('asx.pos', JSON.stringify(pos));
+    guardar('asx.pos', JSON.stringify(pos));
     gm.mapa?.posicao(pos);
     vigiarPosicao();
   }, (e) => { if (pedido) toast(e.code === 1 ? 'Permissão de localização negada.' : 'Não foi possível obter a posição.'); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
@@ -582,7 +589,7 @@ function painelGps() {
 }
 
 // --- Mapa do Google com trânsito (chave do usuário) ---
-const gm = { chave: localStorage.getItem('asx.gmaps') || '', mapa: null, resumo: null, destino: '' };
+const gm = { chave: guardado('asx.gmaps') || '', mapa: null, resumo: null, destino: '' };
 function montarMapa() {
   const el = document.getElementById('gmapa'); if (!el || !gm.chave) return;
   gm.mapa = null;
@@ -600,7 +607,7 @@ function rotaHtml() {
   return `
     <div class="rota-resumo">
       <div class="rr-texto"><b class="rr-tempo">${esc(a.tempo)}</b><small class="muted">${esc(a.distancia)}${a.via ? ` · via ${esc(a.via)}` : ''}${a.tempo !== a.tempoSemTransito ? ` · sem trânsito ${esc(a.tempoSemTransito)}` : ''}</small></div>
-      <a class="btn btn-sm claro rr-ir" href="${l.geo}">Navegar no Vela</a>
+      <a class="btn btn-sm claro rr-ir" href="${esc(l.geo)}">Navegar no Vela</a>
       <button class="btn-ghost btn-sm" data-action="rota-limpar" aria-label="Limpar rota">✕</button>
     </div>
     ${r.rotas.length > 1 ? `<div class="alts" role="group" aria-label="Rotas alternativas">${r.rotas.map((x) => `<button class="alt" data-action="rota-alt" data-i="${x.i}" aria-pressed="${x.i === r.atual}">${esc(x.tempo)} · ${esc(x.via || x.distancia)}</button>`).join('')}</div>` : ''}
@@ -675,7 +682,7 @@ const ctlHtml = (i) => `<div class="ctl">
   <button ${i.attr.prev} aria-label="Faixa anterior">${IC.prev}</button>
   <button class="play" ${i.attr.toggle} aria-label="${i.tocando ? 'Pausar' : 'Tocar'}">${i.tocando ? IC.pause : IC.play}</button>
   <button ${i.attr.next} aria-label="Próxima faixa">${IC.next}</button></div>`;
-const capaHtml = (i) => (i.capa ? `<img class="capa" src="${i.capa}" alt="">` : '<div class="capa"></div>');
+const capaHtml = (i) => (i.capa ? `<img class="capa" src="${esc(i.capa)}" alt="">` : '<div class="capa"></div>');
 function semMidiaHtml() {
   if (!window.AsxNative) return '';
   return cel.acesso ? '<div class="info"><div class="t">Nada tocando</div><div class="d">Dê play no YouTube Music; a faixa aparece aqui.</div></div>'

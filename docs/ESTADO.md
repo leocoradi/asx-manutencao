@@ -12,7 +12,7 @@ Web app (PWA) para acompanhar um Mitsubishi ASX 2017/2018 2.0 16V MIVEC 4x2 manu
 
 | Área | Estado | Observações |
 |---|---|---|
-| Plano de manutenção | pronto | Intervalos de uso severo em `src/data.js`. Sem registro, estima pelo múltiplo do intervalo a partir do odômetro (selo "est."). |
+| Plano de manutenção | pronto | Intervalos de uso severo em `src/data.js`, incluindo troca dos pneus (50.000 km ou 5 anos, estimativa; o manual não fixa quilometragem). Sem registro, estima pelo múltiplo do intervalo a partir do odômetro (selo "est."). |
 | Histórico, combustível, ficha, backup JSON | pronto | |
 | Modelo 3D preto | pronto | GLB CC-BY-4.0 (crédito em `assets/asx-LICENSE.txt`), 291 mil triângulos, meshopt, 2,5 MB. Materiais: 9 carroceria, 18 maçanetas (pretos), 4 pinças (vermelho). Pontos de atenção por área em `src/car.js`. |
 | OBD por Bluetooth LE | código pronto, **não testado em adaptador real** | Perfis GATT FFF0 e 18F0. Decodificador validado com respostas gravadas do OBDb. |
@@ -24,6 +24,7 @@ Web app (PWA) para acompanhar um Mitsubishi ASX 2017/2018 2.0 16V MIVEC 4x2 manu
 | Mapa nativo (Google Navigation SDK) | **removido** | Exigia depósito de R$ 170 no Google Cloud; o dono quer custo zero. Navegação guiada fica com Waze, Google Maps ou Vela. |
 | Interface embutida e modo carro | código pronto, **compilado no CI, não testado no tablet** | `MainActivity.local()` serve `assets/www` no endereço do Pages; `ModoCarro.kt` liga pelo áudio Bluetooth do carro escolhido ou pelo botão. |
 | Início do modo carro: velocidade, odômetro por GPS e atalhos | código pronto, verificado com a ponte e o GPS simulados (`tools/celular-falso.cjs`); **não testado no tablet** | Um só `watchPosition` alimenta mapa, velocidade e odômetro. `passoOdometro` (`src/painel.js`) filtra leitura imprecisa (> 40 m), ruído parado (< 20 m) e salto (> 250 km/h). `S.odo.gps` guarda os km somados desde a última leitura digitada e `S.odo.m` o resto em metros. Atalhos: `AsxNative.apps()` / `abrirApp(id)`, lista fixa em `Ponte.APPS` e em `<queries>`; navegação com `FLAG_ACTIVITY_LAUNCH_ADJACENT`. |
+| Segurança (tríade CIA) | varredura feita; correções verificadas em Chromium e no CI, **política de conteúdo não testada com o Google Maps real** | Achados, correções, riscos aceitos e pendências do dono em `docs/SEGURANCA.md`. |
 | Trânsito ao vivo do Google | pronto, **não testado com chave real** | Mapa JS com TrafficLayer; rota pela **Routes API** (TRAFFIC_AWARE, alternativas). Chave do usuário em `localStorage` (`asx.gmaps`). |
 | Navegação | entregue ao **Vela** pelo intent `geo:` | Botão "Navegar no Vela" com coordenadas do destino. |
 | Layouts | pronto | 390 retrato, 844×390 paisagem, 820 tablet, 1366 desktop, 1024×600 central. |
@@ -53,6 +54,7 @@ Web app (PWA) para acompanhar um Mitsubishi ASX 2017/2018 2.0 16V MIVEC 4x2 manu
 1. **Testar no tablet** (nada das partes de central rodou em aparelho): interface embutida abrindo sem internet; modo carro ligando pelo Bluetooth do rádio; paisagem, tela cheia e Voltar; velocidade e odômetro com GPS real; tela dividida ao abrir Waze ou Maps pelo atalho; self mode do Open Headunit; instalar atualização por cima. Ajustar conforme o retorno.
 1. **Próximas etapas de `docs/CENTRAL.md`**: OBD nativo (etapa 2, que também leva o odômetro por GPS para um serviço em segundo plano), UX automotiva (etapa 3), multitarefa e botão flutuante (etapa 4), registro de falhas no aparelho.
 2. **Testes em hardware real**: adaptador ELM327 BLE no carro; chave do Google no celular; central Hudiy.
+3. **Pendências de segurança do dono** (`docs/SEGURANCA.md`): guardar uma cópia de `assinatura.p12` fora do GitHub; proteger o branch `main`; exportar o backup JSON de tempos em tempos; conferir no tablet que o mapa do Google abre com a política de conteúdo.
 3. **Histórico do git**: dois commits do `main` carregam o e-mail pessoal do autor (commit inicial e merge do PR 1). Remover exige reescrever o histórico com force-push em `main`; só com autorização explícita do dono. Alternativa: ativar "Keep my email addresses private" no GitHub para commits futuros.
 4. **Tablet retrato (820 px)**: card do carro fica estreito e rótulos de motor e elétrica se aproximam. Cosmético.
 5. **Licença do projeto**: sem `LICENSE`. Se quiser permitir reuso, MIT é o padrão; o GLB (CC-BY-4.0), OBDb (CC-BY-SA-4.0), model-viewer (Apache-2.0) e meshopt (MIT) mantêm as suas.
@@ -60,7 +62,7 @@ Web app (PWA) para acompanhar um Mitsubishi ASX 2017/2018 2.0 16V MIVEC 4x2 manu
 ## Como verificar
 
 ```bash
-npm test                      # 25 casos
+npm test                      # 28 casos
 npm start                     # http://localhost:8080
 node tools/screens.cjs shots  # capturas em 390/820/1366 (precisa de playwright instalado)
 node tools/fake-hudiy.mjs assets/icon-512.png   # API Hudiy falsa em ws://localhost:44406 (precisa de ws)

@@ -19,6 +19,8 @@ import kotlin.concurrent.thread
 // por isso o CI assina todos os builds com a mesma chave (rascunho de release "assinatura").
 object Atualizador {
     private const val API = "https://api.github.com/repos/leocoradi/asx-manutencao/releases/latest"
+    // O APK só é baixado das releases deste repositório; o Android ainda confere a assinatura antes de instalar.
+    private const val ORIGEM = "https://github.com/leocoradi/asx-manutencao/releases/download/"
     @Volatile var ouvinte: ((String) -> Unit)? = null
     @Volatile private var apk: String? = null
 
@@ -44,7 +46,7 @@ object Atualizador {
             val codigo = Regex("""^apk-(\d+)$""").find(j.optString("tag_name"))?.groupValues?.get(1)?.toIntOrNull() ?: 0
             val lista = j.optJSONArray("assets")
             val url = (0 until (lista?.length() ?: 0)).map { lista!!.getJSONObject(it) }
-                .firstOrNull { it.optString("name").endsWith(".apk") }?.optString("browser_download_url")
+                .firstOrNull { it.optString("name").endsWith(".apk") }?.optString("browser_download_url")?.takeIf { it.startsWith(ORIGEM) }
             if (codigo > BuildConfig.VERSION_CODE && url != null) {
                 apk = url
                 publicar("disponivel") { put("versao", "1.$codigo"); put("atual", BuildConfig.VERSION_NAME) }

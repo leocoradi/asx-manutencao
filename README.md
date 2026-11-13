@@ -119,7 +119,7 @@ Visualizador: `<model-viewer>` 4.7 (Google, Apache-2.0) e o decodificador meshop
 
 ## Continuidade
 
-`CLAUDE.md` tem as regras do projeto para agentes e `docs/ESTADO.md` tem o estado, as decisões e as pendências. Scripts de verificação em `tools/` (Playwright e `ws` como devDependencies: `npm i`).
+`CLAUDE.md` tem as regras do projeto para agentes e `docs/ESTADO.md` tem o estado, as decisões e as pendências; `docs/SEGURANCA.md` tem a varredura de segurança. Scripts de verificação em `tools/` (Playwright e `ws` como devDependencies: `npm i`).
 
 ## Estrutura
 
@@ -135,6 +135,7 @@ assets/asx.glb      modelo 3D preto (CC-BY-4.0, ver asx-LICENSE.txt)
 src/obd.js          decodificador OBDb, ISO-TP, DTCs, ELM327 BLE, simulador
 src/mapa.js         mapa web do Google com trânsito, rota pela Routes API e entrega ao Vela
 src/painel.js       rotas das abas, manobra a partir da notificação e odômetro por GPS
+src/dados.js        formato e validação dos registros (localStorage e backup)
 src/hudiy.js        cliente da API da central Hudiy (protobuf mínimo, mídia, navegação, OBD, teclas)
 src/signalset.js    sinais no formato OBDb v3
 sw.js               cache offline

@@ -41,11 +41,14 @@ class NotificacoesService : NotificationListenerService() {
         if (mudou) Estado.emitir()
     }
 
-    private fun processar(sbn: StatusBarNotification): Boolean = when {
-        sbn.packageName in NAVEGADORES -> manobra(sbn)
-        ehAviso(sbn) -> aviso(sbn)
-        else -> false
-    }
+    // O conteúdo vem de outros apps: uma notificação malformada é ignorada em vez de derrubar a central.
+    private fun processar(sbn: StatusBarNotification): Boolean = try {
+        when {
+            sbn.packageName in NAVEGADORES -> manobra(sbn)
+            ehAviso(sbn) -> aviso(sbn)
+            else -> false
+        }
+    } catch (e: Exception) { false }
 
     // Só a notificação fixa (em andamento) é a navegação; avisos avulsos ("rota mais rápida") são ignorados.
     private fun manobra(sbn: StatusBarNotification): Boolean {
@@ -79,7 +82,7 @@ class NotificacoesService : NotificationListenerService() {
 
     private fun aviso(sbn: StatusBarNotification): Boolean {
         val e = sbn.notification.extras
-        val titulo = (e.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE) ?: e.getCharSequence(Notification.EXTRA_TITLE))?.toString() ?: ""
+        val titulo = ((e.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE) ?: e.getCharSequence(Notification.EXTRA_TITLE))?.toString() ?: "").take(120)
         val texto = (e.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: "").take(300)
         if (titulo.isEmpty() && texto.isEmpty()) return false
         @Suppress("DEPRECATION")

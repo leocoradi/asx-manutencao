@@ -2,7 +2,6 @@ package br.asx.manutencao
 
 import android.Manifest
 import android.app.Activity
-import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
@@ -30,6 +29,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.Toast
+import java.io.ByteArrayInputStream
 import java.util.Locale
 
 // Casca da central: WebView com a interface embutida no APK + ponte nativa (mídia, manobras, avisos,
@@ -97,6 +97,9 @@ class MainActivity : Activity() {
             databaseEnabled = true
             mediaPlaybackRequiresUserGesture = false
             setGeolocationEnabled(true)
+            // A interface vem de assets pelo interceptador; a WebView não precisa ler arquivos nem content:// do aparelho.
+            allowFileAccess = false
+            allowContentAccess = false
             userAgentString = "$userAgentString AsxApp/3"
         }
         web.addJavascriptInterface(Ponte(this), "AsxNative")
@@ -105,11 +108,14 @@ class MainActivity : Activity() {
             // registros já gravados no aparelho continuam valendo e a central abre sem internet.
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest) = local(request.url)
 
-            // Links do próprio app ficam na WebView; geo:, intents e sites externos vão para o Android.
+            // Só o próprio app navega dentro da WebView. Qualquer outro endereço vai para o Android (se o esquema
+            // for conhecido) ou é descartado: uma página de fora aberta aqui teria acesso à ponte nativa.
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                if (!request.isForMainFrame) return false
                 val u = request.url
-                if (u.scheme in setOf("http", "https") && u.host == base.host) return false
-                return try { startActivity(Intent(Intent.ACTION_VIEW, u)); true } catch (e: ActivityNotFoundException) { false }
+                if (doApp(u) && (u.path ?: "/").startsWith(base.path ?: "/")) return false
+                if (u.scheme in ESQUEMAS_EXTERNOS) try { startActivity(Intent(Intent.ACTION_VIEW, u)) } catch (e: Exception) { }
+                return true
             }
 
             // Se o processo de desenho da WebView morrer (memória), recria em vez de deixar a tela em branco.
@@ -123,23 +129,32 @@ class MainActivity : Activity() {
         }
         web.webChromeClient = object : WebChromeClient() {
             override fun onGeolocationPermissionsShowPrompt(origin: String, callback: GeolocationPermissions.Callback) {
-                if (temLocalizacao()) callback.invoke(origin, true, true)
+                // Só a interface do app recebe a posição; um quadro de outra origem dentro da WebView, não.
+                if (!doApp(Uri.parse(origin))) callback.invoke(origin, false, false)
+                else if (temLocalizacao()) callback.invoke(origin, true, true)
                 else { geoOrigem = origin; geoCallback = callback; pedirLocalizacao() }
             }
         }
     }
 
-    // Arquivo embutido (assets/www) para um endereço do app; null deixa ir para a rede.
+    private fun doApp(u: Uri) = u.scheme == "https" && u.host == base.host
+
+    // Arquivo embutido (assets/www) para um endereço do app; null (outros sites) deixa ir para a rede.
+    // No endereço do app, o que não está embutido responde 404: a interface vem só de dentro do APK assinado,
+    // nunca da rede, e a central não fica esperando um servidor quando está sem internet.
     private fun local(url: Uri): WebResourceResponse? {
         if (url.host != base.host) return null
         val prefixo = base.path ?: "/"
-        val caminho = url.path ?: return null
-        if (!caminho.startsWith(prefixo)) return null
+        val caminho = url.path ?: ""
         val arquivo = caminho.removePrefix(prefixo).let { if (it.isEmpty() || it.endsWith("/")) it + "index.html" else it }
-        if (arquivo.contains("..")) return null
         val tipo = TIPOS[arquivo.substringAfterLast('.', "").lowercase()] ?: "application/octet-stream"
         val texto = tipo.startsWith("text/") || tipo.endsWith("json") || tipo.endsWith("javascript")
-        return try { WebResourceResponse(tipo, if (texto) "utf-8" else null, assets.open("www/$arquivo")) } catch (e: Exception) { null }
+        return try {
+            if (!caminho.startsWith(prefixo) || arquivo.contains("..")) throw IllegalArgumentException(arquivo)
+            WebResourceResponse(tipo, if (texto) "utf-8" else null, assets.open("www/$arquivo"))
+        } catch (e: Exception) {
+            WebResourceResponse("text/plain", "utf-8", 404, "Not Found", emptyMap(), ByteArrayInputStream(ByteArray(0)))
+        }
     }
 
     @Suppress("DEPRECATION")
@@ -214,6 +229,7 @@ class MainActivity : Activity() {
     }
 
     companion object {
+        private val ESQUEMAS_EXTERNOS = setOf("https", "http", "geo", "google.navigation")
         private val TIPOS = mapOf(
             "html" to "text/html", "css" to "text/css", "js" to "text/javascript", "mjs" to "text/javascript",
             "json" to "application/json", "webmanifest" to "application/manifest+json", "svg" to "image/svg+xml",

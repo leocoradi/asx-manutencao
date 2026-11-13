@@ -1,6 +1,6 @@
 # Guia para agentes neste repositório
 
-Leia também `docs/ESTADO.md` (o que existe, decisões, pendências) e `docs/CENTRAL.md` (objetivo atual: central multimídia dedicada num tablet no painel, e a ordem de execução) antes de mudar qualquer coisa. `docs/STRADAOS.md` é a avaliação de um launcher de terceiros e das ideias aproveitadas dele. `docs/PLANO.md` é histórico da fase em que o celular era a tela principal.
+Leia também `docs/ESTADO.md` (o que existe, decisões, pendências) e `docs/CENTRAL.md` (objetivo atual: central multimídia dedicada num tablet no painel, e a ordem de execução) antes de mudar qualquer coisa. `docs/SEGURANCA.md` lista os achados de segurança (corrigidos, aceitos e pendentes) e o que não pode regredir. `docs/STRADAOS.md` é a avaliação de um launcher de terceiros e das ideias aproveitadas dele. `docs/PLANO.md` é histórico da fase em que o celular era a tela principal.
 
 ## Regras do projeto
 
@@ -9,6 +9,7 @@ Leia também `docs/ESTADO.md` (o que existe, decisões, pendências) e `docs/CEN
 - **Idioma**: interface, comentários, commits e documentação em português do Brasil.
 - **Dados do usuário só no aparelho**: `localStorage` (registros em `asx.v1`, chaves e preferências em `asx.*`). Nenhum backend, nenhuma telemetria. Chaves de API do usuário nunca vão para o repositório.
 - **Repositório público**: não commitar backups (`asx-backup-*.json`), chaves, e-mails, endereços ou qualquer dado pessoal. Commits usam o endereço noreply.
+- **Segurança**: todo texto que vem de fora (backup, notificações, Bluetooth, rede, endereço) passa por `esc()` antes de virar HTML; dado importado passa por `validar()`; nada de script em linha nem atributo `on*` (a política de conteúdo em `index.html` bloqueia). No APK, só o endereço do próprio app navega na WebView.
 - **Testes**: lógica nova com ramo, laço, parser ou protocolo ganha um caso em `tests/*.test.mjs` (`node:test`, sem instalar nada). `npm test` precisa passar antes de qualquer push; o workflow de Pages também roda os testes.
 - **Verificação visual**: `tools/screens.cjs` (Playwright) gera capturas em 390, 820 e 1366 px; paisagem de celular é 844×390. Conferir antes de commitar mudanças de layout.
 - **Fluxo git**: desenvolver no branch de trabalho, commits pequenos com mensagem explicando o porquê, push, e abrir pull request para `main`. O merge é do dono do repositório. O push em `main` publica no GitHub Pages. Nunca force-push em `main`.
@@ -20,6 +21,7 @@ index.html          app shell, navegação, rodapé do player
 style.css           tema (Nothing UI: preto, cartões brancos, fonte Doto, tracejados, vermelho só em alerta) e breakpoints
 src/app.js          estado, telas (Início, Navegação, Manutenção com Plano/Ficha/OBD, Combustível), formulários, backup, mídia, avisos, mapa, Hudiy
 src/painel.js       lógica pura: rotas das abas, manobra a partir da notificação, odômetro por GPS, formatação
+src/dados.js        registros do usuário: formato vazio e validação do que vem do localStorage e do backup
 src/data.js         base técnica do veículo e plano de manutenção (uso severo)
 src/plan.js         vencimento (km/tempo, estimativa pelo odômetro) e consumo
 src/car.js          modelo 3D (model-viewer) e silhueta SVG com pontos por área
