@@ -23,6 +23,7 @@ Web app (PWA) para acompanhar um Mitsubishi ASX 2017/2018 2.0 16V MIVEC 4x2 manu
 | Abas e tela de Navegação | pronto | Início, Navegação, Manutenção (Plano/Ficha/OBD), Combustível. Navegação em grid: mapa, mídia, avisos. Verificado em 390×844, 844×390, 1024×600 com a ponte simulada (`tools/celular-falso.cjs`). |
 | Mapa nativo (Google Navigation SDK) | **removido** | Exigia depósito de R$ 170 no Google Cloud; o dono quer custo zero. Navegação guiada fica com Waze, Google Maps ou Vela. |
 | Interface embutida e modo carro | código pronto, **compilado no CI, não testado no tablet** | `MainActivity.local()` serve `assets/www` no endereço do Pages; `ModoCarro.kt` liga pelo áudio Bluetooth do carro escolhido ou pelo botão. |
+| Início do modo carro: velocidade, odômetro por GPS e atalhos | código pronto, verificado com a ponte e o GPS simulados (`tools/celular-falso.cjs`); **não testado no tablet** | Um só `watchPosition` alimenta mapa, velocidade e odômetro. `passoOdometro` (`src/painel.js`) filtra leitura imprecisa (> 40 m), ruído parado (< 20 m) e salto (> 250 km/h). `S.odo.gps` guarda os km somados desde a última leitura digitada e `S.odo.m` o resto em metros. Atalhos: `AsxNative.apps()` / `abrirApp(id)`, lista fixa em `Ponte.APPS` e em `<queries>`; navegação com `FLAG_ACTIVITY_LAUNCH_ADJACENT`. |
 | Trânsito ao vivo do Google | pronto, **não testado com chave real** | Mapa JS com TrafficLayer; rota pela **Routes API** (TRAFFIC_AWARE, alternativas). Chave do usuário em `localStorage` (`asx.gmaps`). |
 | Navegação | entregue ao **Vela** pelo intent `geo:` | Botão "Navegar no Vela" com coordenadas do destino. |
 | Layouts | pronto | 390 retrato, 844×390 paisagem, 820 tablet, 1366 desktop, 1024×600 central. |
@@ -42,6 +43,8 @@ Web app (PWA) para acompanhar um Mitsubishi ASX 2017/2018 2.0 16V MIVEC 4x2 manu
 - **Vela (github.com/PimpinPumpkin/Vela)**: app nativo Android, GPL-3; não embute em web. Registra `geo:`, `google.navigation:` e é app de navegação do Android Auto. Seu trânsito vem de endpoint não oficial do Google; **não replicar** isso aqui (CORS impede em web, viola termos, quebra sem aviso).
 - **Google Maps**: Directions API (legada) não pode ser ativada em projetos novos desde outubro de 2026; por isso a rota usa a Routes API. Cotas grátis mensais: 10 mil cargas de mapa, 5 mil rotas com trânsito. Exige conta de faturamento com cartão. Termos proíbem guiar curva a curva no app; por isso a condução vai para o Vela.
 - **StradaOS (github.com/lordnordic-debug/StradaOS)**: launcher GPL-3.0 para centrais Android antigas; sem OBD, rota, trânsito ou modo carro, e o "Android Auto" dele é projeção do celular. Não substitui o nosso caminho e o código não é reaproveitado; quatro ideias entram no roteiro (odômetro e velocidade por GPS, atalhos de apps, registro de falhas). Avaliação em `docs/STRADAOS.md`.
+- **Odômetro por GPS em JavaScript, não em serviço nativo**: conta só com a central visível (inteira ou em tela dividida). Com outro app em tela cheia a WebView pausa e o trecho entra como linha reta entre o último e o próximo ponto, o que subestima. Aceito por ora porque o plano é navegar com o app ao lado e porque qualquer leitura real (abastecimento, serviço, "Atualizar") acima da última digitada substitui a estimativa. A contagem em segundo plano entra junto com o serviço em primeiro plano da etapa 2.
+- **Android Auto no tablet**: pelo Open Headunit, como app separado aberto por atalho. Não é embutido (AGPL-3.0, engenharia reversa do protocolo). O self mode, sem celular, depende de o Android Auto instalar no tablet e de uma opção de desenvolvedor no Android Auto 17.4+; **não verificado no S6 Lite**.
 - **Hudiy**: protobuf das poucas mensagens usadas é codificado à mão (`src/hudiy.js`) em vez de carregar protobuf.js e o `.proto`.
 - **Fonte Doto (Google Fonts)**: a mais próxima da NDot do Nothing UI disponível livremente.
 
@@ -57,7 +60,7 @@ Web app (PWA) para acompanhar um Mitsubishi ASX 2017/2018 2.0 16V MIVEC 4x2 manu
 ## Como verificar
 
 ```bash
-npm test                      # 24 casos
+npm test                      # 25 casos
 npm start                     # http://localhost:8080
 node tools/screens.cjs shots  # capturas em 390/820/1366 (precisa de playwright instalado)
 node tools/fake-hudiy.mjs assets/icon-512.png   # API Hudiy falsa em ws://localhost:44406 (precisa de ws)

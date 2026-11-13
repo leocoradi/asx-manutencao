@@ -13,6 +13,12 @@
     <queries>
         <intent><action android:name="android.intent.action.VIEW" /><data android:scheme="geo" /></intent>
         <intent><action android:name="android.intent.action.VIEW" /><data android:scheme="https" /></intent>
+        <!-- Atalhos do Início no modo carro (mesma lista de Ponte.APPS). -->
+        <package android:name="com.waze" />
+        <package android:name="com.google.android.apps.maps" />
+        <package android:name="app.vela" />
+        <package android:name="com.google.android.apps.youtube.music" />
+        <package android:name="com.andrerinas.headunitrevived" />
     </queries>
 
     <application
@@ -22,11 +28,12 @@
         android:usesCleartextTraffic="false"
         android:allowBackup="false">
 
+        <!-- smallestScreenSize em configChanges: entrar em tela dividida não recria a activity nem recarrega a WebView. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|uiMode"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

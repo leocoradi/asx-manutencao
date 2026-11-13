@@ -42,6 +42,7 @@ O APK é a central do carro num tablet (pensado para o Galaxy Tab S6 Lite no pai
 
 - **Interface embutida**: os arquivos do site vão dentro do APK e são servidos no mesmo endereço do GitHub Pages, então a central abre sem internet e os registros já gravados no aparelho continuam valendo.
 - **Modo carro**: liga quando o tablet conecta ao áudio Bluetooth do carro escolhido (ou pelo botão do carro no topo) e desliga quando desconecta. No modo carro: paisagem, tela cheia, tela sempre acesa e Voltar não fecha o app. Fora dele, o ASX é um app comum.
+- **Início no modo carro**: velocidade pelo GPS do tablet; **odômetro automático**, que soma a distância percorrida ao último valor digitado (o Início mostra quantos km vieram do GPS, e um abastecimento ou "Atualizar" com a leitura do painel corrige o desvio); e **atalhos** para os apps instalados entre Waze, Google Maps, Vela, YouTube Music e Android Auto. Os de navegação abrem em tela dividida, ao lado da central. O odômetro só conta com a central na tela (inteira ou dividida).
 - **Sessão de mídia**: lê o que está tocando no tablet e manda os controles (`MediaSessionManager`).
 - **Notificações**: manobra do Vela, Google Maps ou Waze e central de avisos (`NotificationListenerService`), só em memória.
 - **Sistema**: links externos abrem os apps do Android; barras do sistema viram margem; se o processo de desenho da WebView morrer, ela é recriada; pedido de isenção de otimização de bateria.
@@ -56,6 +57,7 @@ Onde baixar: em **Releases**, na versão mais nova ("App 1.N"). Cada build do `m
 2. **Bateria**: na mesma seção, **Liberar uso de bateria**. Em *Configurações → Bateria → Limites de uso em segundo plano*, coloque ASX, Waze e YouTube Music em **Apps nunca suspensos**. Ligue **Proteger bateria** (carga até 85%) por causa do calor no painel.
 3. **Abrir sozinho** (opcional): em *Configurações → Modos e rotinas → Rotinas → +*, condição **Dispositivo Bluetooth conectado** (o rádio do carro), ações **Abrir app** (ASX), **Não perturbar** e **Tempo limite da tela** no máximo. Ao desconectar, a rotina desfaz os ajustes. Há relatos de ajustes que não voltam; confira no tablet e, se preciso, adicione ações de término.
 4. **Sem bloqueio no carro** (opcional): *Configurações → Tela de bloqueio → Smart Lock → Dispositivos confiáveis*, adicione o Bluetooth do rádio. Em casa o bloqueio continua.
+5. **Android Auto no tablet** (opcional): instale o [Open Headunit](https://github.com/andreknieriem/open-headunit) (app separado, AGPL-3.0, não certificado pelo Google). O atalho **Android Auto** aparece no Início do modo carro e abre esse app, que recebe a projeção do celular por cabo USB ou Wi-Fi, ou roda o Android Auto do próprio tablet ("self mode", depende de o Android Auto instalar no tablet). A configuração é feita dentro do Open Headunit.
 
 ### Atualizar
 

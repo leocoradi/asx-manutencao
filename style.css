@@ -65,6 +65,12 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 .stack { display: flex; flex-direction: column; gap: 4px; }
 .big { font-size: 44px; line-height: 1; }
 .mid { font-size: 26px; line-height: 1.1; }
+/* Modo carro no Início: velocidade lida a 60–70 cm e atalhos com alvo de 76 px (diretriz para telas de carro). */
+.vel { font-size: 88px; line-height: 1; }
+.vel ~ h2 { margin-top: 14px; }
+.atalhos { display: flex; gap: 12px; flex-wrap: wrap; }
+.atalhos button { flex: 1 1 150px; min-height: 76px; border-radius: var(--r); background: var(--bg-2); color: var(--fg); border: 2px solid var(--line); display: inline-flex; align-items: center; justify-content: center; gap: 10px; font-size: 18px; }
+.atalhos svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 
 /* Barra segmentada estilo Nothing */
 .seg { display: flex; gap: 4px; margin-top: 8px; }

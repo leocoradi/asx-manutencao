@@ -4,7 +4,7 @@ import { carro, carro3d, CARRO_3D } from './car.js';
 import { Elm327Ble, HudiyObd, Simulador, COMANDOS } from './obd.js';
 import { Hudiy, MSG, TECLA, mediaStatus, mediaMeta, navStatus, navDetalhes, navDistancia, imagemUrl } from './hudiy.js';
 import { carregarGoogle, MapaTransito, linksNavegar } from './mapa.js';
-import { analisarHash, manobraDeNotificacao, mmss } from './painel.js';
+import { analisarHash, manobraDeNotificacao, mmss, passoOdometro } from './painel.js';
 
 // --- Estado e persistência (localStorage + backup JSON) ---
 const KEY = 'asx.v1';
@@ -17,7 +17,7 @@ function validar(d) {
   const data = (s) => (/^\d{4}-\d{2}-\d{2}$/.test(s) ? s : hojeIso());
   return {
     v: 1,
-    odo: { km: num(d.odo?.km), data: data(d.odo?.data) },
+    odo: { km: num(d.odo?.km), data: data(d.odo?.data), gps: num(d.odo?.gps), m: num(d.odo?.m) }, // gps: km somados pelo GPS desde a última leitura digitada; m: resto em metros
     log: d.log.map((e) => ({ id: String(e.id ?? crypto.randomUUID()), data: data(e.data), km: num(e.km), custo: num(e.custo), obs: String(e.obs ?? '').slice(0, 500),
       itens: (Array.isArray(e.itens) ? e.itens : []).filter((i) => PLANO.some((p) => p.id === i)) })),
     fuel: d.fuel.map((f) => ({ id: String(f.id ?? crypto.randomUUID()), data: data(f.data), km: num(f.km), litros: num(f.litros), valor: num(f.valor), cheio: !!f.cheio })),
@@ -66,13 +66,17 @@ function inicio() {
   return `
   <div class="grid">
     <div class="faixa-slot full" aria-live="polite">${faixaHtml()}</div>
+    ${atalhosHtml()}
     <section class="card dark">
+      ${cel.carro?.ativo ? `<h2>Velocidade</h2>
+      <div class="num vel" data-gps="vel">${gps.vel ?? '--'}</div>
+      <small class="muted">km/h · GPS</small>` : ''}
       <h2>Odômetro</h2>
       <div class="row">
-        <div class="num big">${km(S.odo.km)}</div>
+        <div class="num big" data-gps="odo">${km(S.odo.km)}</div>
         <button class="btn-ghost btn-sm" data-action="km">Atualizar</button>
       </div>
-      <small class="muted">km · em ${dataBr(S.odo.data)}</small>
+      <small class="muted" data-gps="odo-info">${odoInfo()}</small>
     </section>
     <section class="card dark span-2">
       <h2>${esc(VEICULO.nome)}</h2>
@@ -101,6 +105,19 @@ function inicio() {
       <div class="actions"><a class="btn btn-sm" href="#/combustivel" style="text-decoration:none;display:inline-flex;align-items:center">Registrar abastecimento</a></div>
     </section>
   </div>`;
+}
+
+const odoInfo = () => `km · em ${dataBr(S.odo.data)}${S.odo.gps ? ` · ${km(S.odo.gps)} km somados pelo GPS` : ''}`;
+// Atalhos do modo carro: apps instalados entre os que o APK conhece; navegação abre ao lado da central.
+const IC_APP = {
+  nav: '<path d="M12 3l7 17-7-4-7 4z"/>',
+  musica: '<path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>',
+  auto: '<path d="M5 17h14M6 17v2M18 17v2M4 13l2-6h12l2 6v4H4zM4 13h16"/>',
+};
+function atalhosHtml() {
+  if (!cel.carro?.ativo || !cel.apps?.length) return '';
+  return `<nav class="atalhos full" aria-label="Abrir apps">${cel.apps.map((a) => `
+    <button data-action="app" data-id="${esc(a.id)}"><svg viewBox="0 0 24 24" aria-hidden="true">${IC_APP[a.tipo] || ''}</svg><span>${esc(a.nome)}</span></button>`).join('')}</nav>`;
 }
 
 function navegacao() {
@@ -312,7 +329,7 @@ function dlgRegistrar(itemId) {
 function dlgKm() {
   abrir(`<h2>Odômetro</h2>
   <form data-form="km">
-    <label>Quilometragem atual<input name="km" type="number" inputmode="numeric" min="${S.odo.km}" step="1" required value="${S.odo.km || ''}" autofocus></label>
+    <label>Quilometragem atual<input name="km" type="number" inputmode="numeric" min="${S.odo.km - (S.odo.gps || 0)}" step="1" required value="${S.odo.km || ''}" autofocus></label>
     <div class="actions"><button type="submit">Salvar</button><button type="button" class="btn-ghost" data-action="fechar">Cancelar</button></div>
   </form>`);
 }
@@ -392,7 +409,8 @@ function formDados(f) {
   return { data: fd.get('data'), km: +fd.get('km'), litros: +fd.get('litros'), valor: +fd.get('valor'), custo: +fd.get('custo') || 0, obs: (fd.get('obs') || '').trim(), cheio: fd.get('cheio') === 'on', itens: fd.getAll('itens'), destino: (fd.get('destino') || '').trim(), url: (fd.get('url') || '').trim(), chave: (fd.get('chave') || '').trim() };
 }
 function atualizaOdo(kmNovo, data) {
-  if (kmNovo > S.odo.km) S.odo = { km: kmNovo, data: data > S.odo.data ? data : S.odo.data };
+  // Uma leitura real acima da última digitada substitui o que o GPS somou desde então.
+  if (kmNovo > S.odo.km - (S.odo.gps || 0)) S.odo = { km: kmNovo, data: data > S.odo.data ? data : S.odo.data };
 }
 document.addEventListener('submit', (e) => {
   const f = e.target; if (!f.dataset.form) return;
@@ -446,6 +464,7 @@ document.addEventListener('click', (e) => {
   else if (a === 'carro-lembrar') { window.AsxNative.lembrarCarro(el.dataset.nome); dlg.close(); toast(`“${el.dataset.nome}” é o carro.`); }
   else if (a === 'carro-esquecer') { window.AsxNative.lembrarCarro(''); dlg.close(); }
   else if (a === 'bateria') window.AsxNative.pedirBateria();
+  else if (a === 'app') window.AsxNative.abrirApp(el.dataset.id);
   else if (a.startsWith('aviso-')) window.AsxNative.aviso(a.slice(6), el.dataset.chave);
   else if (a === 'obd-ble') obdConectar(new Elm327Ble());
   else if (a === 'obd-hudiy') { conectarCentral(); obdConectar(new HudiyObd(central)); }
@@ -531,8 +550,29 @@ function localizar(pedido) {
 }
 let vigia;
 function vigiarPosicao() {
-  vigia ??= navigator.geolocation.watchPosition((g) => { pos = { lat: g.coords.latitude, lon: g.coords.longitude }; gm.mapa?.posicao(pos); }, () => {}, { enableHighAccuracy: true, maximumAge: 5000 });
+  vigia ??= navigator.geolocation?.watchPosition((g) => { pos = { lat: g.coords.latitude, lon: g.coords.longitude }; gm.mapa?.posicao(pos); aoGps(g.coords, g.timestamp); },
+    () => { gps.vel = null; painelGps(); }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 });
 }
+
+// --- GPS no modo carro: velocidade no Início e odômetro automático ---
+// Só conta com a central visível (inteira ou em tela dividida); o valor digitado ou lido no abastecimento corrige o desvio.
+const gps = { ref: null, vel: null };
+function aoGps(c, t) {
+  if (!cel.carro?.ativo) return;
+  gps.vel = Number.isFinite(c.speed) ? Math.round(c.speed * 3.6) : null;
+  const p = passoOdometro(gps.ref, { lat: c.latitude, lon: c.longitude, t, precisao: c.accuracy });
+  gps.ref = p.ref;
+  S.odo.m = (S.odo.m || 0) + p.metros;
+  const inteiros = Math.floor(S.odo.m / 1000);
+  if (inteiros) { S.odo = { km: S.odo.km + inteiros, data: hojeIso(), gps: (S.odo.gps || 0) + inteiros, m: S.odo.m - inteiros * 1000 }; salvar(); }
+  painelGps();
+}
+function painelGps() {
+  const set = (k, v) => { const el = main.querySelector(`[data-gps="${k}"]`); if (el) el.textContent = v; };
+  set('vel', gps.vel ?? '--'); set('odo', km(S.odo.km)); set('odo-info', odoInfo());
+}
+// O resto em metros (menos de 1 km) é gravado quando a central sai da tela.
+document.addEventListener('visibilitychange', () => { if (document.hidden && cel.carro?.ativo) salvar(); });
 
 // --- Mapa do Google com trânsito (chave do usuário) ---
 const gm = { chave: localStorage.getItem('asx.gmaps') || '', mapa: null, resumo: null, destino: '' };
@@ -568,7 +608,7 @@ function rotaAtualizar() { const el = main.querySelector('.rota-info'); if (el) 
 navigator.permissions?.query({ name: 'geolocation' }).then((p) => { if (p.state === 'granted') localizar(false); }).catch(() => {});
 
 // --- APK: mídia, manobra, avisos e modo carro pela ponte nativa (window.AsxNative / window.asxNativo) ---
-const cel = { acesso: false, midia: null, avisos: [], carro: null };
+const cel = { acesso: false, midia: null, avisos: [], carro: null, apps: [] };
 function celAplicar(e) {
   const carroAntes = !!cel.carro?.ativo;
   Object.assign(cel, { acesso: !!e.acesso, midia: e.midia || null, avisos: e.avisos || [], carro: e.carro || null });
@@ -589,13 +629,20 @@ function aplicarCarro(antes) {
   btnCarro.hidden = !window.AsxNative?.modoCarro;
   btnCarro.setAttribute('aria-pressed', String(ativo));
   btnCarro.setAttribute('aria-label', ativo ? 'Sair do modo carro' : 'Entrar no modo carro');
-  if (ativo && !antes && location.hash !== '#/') location.hash = '#/';
+  if (ativo === antes) return;
+  if (ativo) vigiarPosicao(); else Object.assign(gps, { ref: null, vel: null });
+  // O Início muda com o modo carro (velocidade e atalhos): volta para ele ao entrar e redesenha se já estiver nele.
+  if (ativo && location.hash !== '#/') location.hash = '#/'; else if (document.body.dataset.view === 'inicio') render();
 }
 window.asxNativo = {
   evento: (json) => { try { celAplicar(typeof json === 'string' ? JSON.parse(json) : json); } catch (err) { console.error(err); } },
   atualizacao: (json) => { try { atualizacao(typeof json === 'string' ? JSON.parse(json) : json); } catch (err) { console.error(err); } },
 };
-function celSincronizar() { if (window.AsxNative) { try { celAplicar(JSON.parse(window.AsxNative.estado())); } catch {} } }
+function celSincronizar() {
+  if (!window.AsxNative) return;
+  try { cel.apps = JSON.parse(window.AsxNative.apps?.() || '[]'); } catch { cel.apps = []; }
+  try { celAplicar(JSON.parse(window.AsxNative.estado())); } catch {}
+}
 document.addEventListener('visibilitychange', () => { if (!document.hidden) celSincronizar(); });
 
 // --- Mídia: rodapé (todas as abas) e widget (aba Navegação), com a mesma fonte de dados ---
