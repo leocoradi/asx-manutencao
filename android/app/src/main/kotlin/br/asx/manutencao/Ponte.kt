@@ -49,9 +49,13 @@ class Ponte(private val act: MainActivity) {
             .forEach { put(JSONObject().put("id", it.pacote).put("nome", it.nome).put("tipo", it.tipo)) }
     }.toString()
     // Abre um app da lista (nenhum outro pacote é aceito). Navegação abre em tela dividida, ao lado da central.
+    // Com endereço próprio (Android Auto), vai direto à função; se a versão instalada não o reconhecer, abre o app.
     @JavascriptInterface fun abrirApp(id: String) {
         val app = APPS.firstOrNull { it.pacote == id } ?: return
-        val i = act.packageManager.getLaunchIntentForPackage(id) ?: return
+        val inicial = act.packageManager.getLaunchIntentForPackage(id) ?: return
+        val direto = app.endereco?.let { Intent(Intent.ACTION_VIEW, Uri.parse(it)).setPackage(id) }
+            ?.takeIf { it.resolveActivity(act.packageManager) != null }
+        val i = (direto ?: inicial).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         if (app.aoLado) i.addFlags(Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT)
         act.runOnUiThread { try { act.startActivity(i) } catch (e: Exception) { } }
     }
@@ -64,7 +68,7 @@ class Ponte(private val act: MainActivity) {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
-    private class App(val pacote: String, val nome: String, val tipo: String, val aoLado: Boolean)
+    private class App(val pacote: String, val nome: String, val tipo: String, val aoLado: Boolean, val endereco: String? = null)
     private companion object {
         // Os pacotes também estão em <queries> no manifesto; sem isso o Android 11+ não os enxerga.
         val APPS = listOf(
@@ -72,8 +76,8 @@ class Ponte(private val act: MainActivity) {
             App("com.google.android.apps.maps", "Google Maps", "nav", true),
             App("app.vela", "Vela", "nav", true),
             App("com.google.android.apps.youtube.music", "YouTube Music", "musica", false),
-            // Open Headunit: mostra o Android Auto (projetado pelo celular ou pelo próprio tablet).
-            App("com.andrerinas.headunitrevived", "Android Auto", "auto", false),
+            // Open Headunit: headunit://selfmode inicia o Android Auto do próprio tablet (Self Mode) num toque.
+            App("com.andrerinas.headunitrevived", "Android Auto", "auto", false, "headunit://selfmode"),
         )
     }
 }

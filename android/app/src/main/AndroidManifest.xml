@@ -19,6 +19,7 @@
         <package android:name="app.vela" />
         <package android:name="com.google.android.apps.youtube.music" />
         <package android:name="com.andrerinas.headunitrevived" />
+        <intent><action android:name="android.intent.action.VIEW" /><data android:scheme="headunit" /></intent>
     </queries>
 
     <application
